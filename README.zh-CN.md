@@ -71,8 +71,8 @@ if __name__ == "__main__":
     app.run(debug=True)
 ```
 
-检测到 `dash-antd-components` bundle 后，如果没有显式设置 `loader`，插件会自动使用
-Ant Design 四圆点 loader；Dash 原生组件默认使用 Loading UI 的 `ring` loader。
+所有应用的 `loader="default"` 都使用 Ant Design 四圆点 spinner。
+如需 Loading UI 的 ring，可调用 `setup(loader="ring")`。
 
 ## 主题初始化
 
@@ -80,7 +80,8 @@ Ant Design 四圆点 loader；Dash 原生组件默认使用 Loading UI 的 `ring
 
 ## Dash Ant Design
 
-检测到 Dash Ant Design bundle 且没有显式设置 `loader` 时，插件使用 Ant Design 四圆点 loader；其他应用默认使用 Loading UI 的 `ring`。显式 loader 和颜色参数始终优先。
+Dash Ant Design 是可选依赖。默认的 Ant Design 四圆点 loader 已包含在插件中，
+无需安装 Dash Ant Design 即可使用。可通过 loader 和颜色参数自定义外观。
 
 ```bash
 pip install dash-ant-design
@@ -93,13 +94,13 @@ uv add dash-ant-design
 ```python
 from dash_startup_loading_plugin import setup
 
-setup(loader="antd", loader_color="#1677ff")
+setup(loader="default", loader_color="#1677ff")
 ```
 
 也可以仅显式选择 Ant Design loader：
 
 ```python
-setup(loader="antd")
+setup(loader="default")
 ```
 
 ## 配置项
@@ -115,9 +116,9 @@ setup(loader="antd")
 | `loader_dark_color` | `#1668dc` | loader 暗色颜色。 |
 | `loader_text_color` | `rgba(0,0,0,0.88)` | `text-*` loader 亮色文字颜色。 |
 | `loader_dark_text_color` | `rgba(255,255,255,0.85)` | `text-*` loader 暗色文字颜色。 |
-| `loader` | `"default"` | 默认使用 Loading UI `ring`；Dash Ant Design 未显式配置时使用 `antd`。 |
+| `loader` | `"default"` | Ant Design 四圆点 spinner；可选 `"ring"` 使用 Loading UI ring。 |
 | `loader_text` | `"Loading"` | `text-*` loader 的文字。 |
-| `loader_size` | `64` | Loading UI 的目标尺寸；AntD loader 使用 Spin medium 的 20px 视觉尺寸。 |
+| `loader_size` | `32` | loader 的尺寸基准。默认 Ant Design spinner 使用与 Spin middle 一致的 20px 尺寸；其他常规 loader 使用 2rem（32px）基准。下列八个例外按其原有几何比例缩放。 |
 | `loader_stroke_width` | `2` | Loading UI 边框和 SVG 描边宽度。 |
 | `custom_loader_html` | `None` | 替换 loader 的可信 HTML。 |
 
@@ -127,7 +128,13 @@ setup(loader="antd")
 
 ## Loading UI
 
-除 `antd` 外的 Loading UI loader 会按需加载隔离 renderer。每个 loader 单独打包，页面只引用当前选中的那个（`<requests_pathname_prefix>_dash-startup-loading/<loader>.js`），因此 HTML 体积不受 loader 选择影响，且 renderer 可被浏览器长期缓存，不拖慢首屏。可用 `loader_text`、颜色参数和尺寸参数自定义 loader：
+默认的 `default` loader 使用内联 HTML 和 CSS。Loading UI loader 会按需加载隔离 renderer。每个 loader 单独打包，页面只引用当前选中的那个（`<requests_pathname_prefix>_dash-startup-loading/<loader>.js`），因此 HTML 体积不受 loader 选择影响，且 renderer 可被浏览器长期缓存，不拖慢首屏。可用 `loader_text`、颜色参数和尺寸参数自定义 loader：
+
+资源基于固定版本的 Loading UI 源码生成，使用轻量 DOM 渲染器一次性挂载。
+每个包只包含自身所需的样式与动画，不再携带 React、React DOM、Motion 或完整
+Tailwind 样式表；Motion 循环动画转换为原生 CSS 关键帧或 SVG 路径动画。
+执行 `python scripts/build_loading_ui.py` 可重新构建（需要 Node.js 和 npm）。
+此渲染器专用于固定版本的 loader 集合，不用于渲染任意 React 组件。
 
 ```python
 setup(loader="text-shimmer", loader_text="正在准备仪表盘", loader_color="#1677ff")
@@ -135,12 +142,21 @@ setup(loader="text-shimmer", loader_text="正在准备仪表盘", loader_color="
 
 ## Loader 预览
 
-实际默认 loader 取决于应用使用的组件 bundle：
+除特殊项外，loader 的尺寸均为 2rem × 2rem；默认 Ant Design spinner 与 AntD Spin middle 一致，为 20px × 20px；
+`infinity` 和 `morphing-infinity` 为 3rem × 3rem。
+四种 `text-*` loader 保留原字号；`wave` 为宽 3rem、高 2rem；
+`triple-dot-spinner` 和 `twin-orbit` 为 0.6rem × 0.6rem；`swirling` 等比例缩小至
+原始 6rem × 6rem 尺寸。`accordion-loader`、`conveyor-loop`、`infinity-square-snake`、
+`infinity-track`、`square-accordion`、`square-grid`、`symmetric-wave`、
+`square-snake` 保留原有几何设置。
+`loader_size` 会在默认几何基础上按比例缩放。
+
+所有组件库使用相同的默认 loader：
 
 | 应用 | 默认 loader | 说明 |
 | --- | --- | --- |
-| Dash 原生组件 | `ring` | Loading UI renderer。 |
-| `dash-antd-components` | `antd` | Ant Design 四圆点 spinner。 |
+| Dash 原生组件 | `default` | Ant Design 四圆点 spinner。 |
+| `dash-antd-components` | `default` | Ant Design 四圆点 spinner。 |
 | 显式调用 `setup(loader=...)` 的应用 | 选定的 loader | 显式配置始终优先。 |
 
 所有 Loading UI loader 都单独打包，只在被选中时加载。下面的预览图链接到官方
@@ -165,8 +181,7 @@ setup(loader="text-shimmer", loader_text="正在准备仪表盘", loader_color="
 | [![symmetric-wave](https://loading-ui.com/api/og/components/symmetric-wave/image.png)](https://loading-ui.com/docs/components/symmetric-wave)<br>`symmetric-wave` | [![terminal](https://loading-ui.com/api/og/components/terminal/image.png)](https://loading-ui.com/docs/components/terminal)<br>`terminal` | [![text-blink](https://loading-ui.com/api/og/components/text-blink/image.png)](https://loading-ui.com/docs/components/text-blink)<br>`text-blink` |
 | [![text-dots](https://loading-ui.com/api/og/components/text-dots/image.png)](https://loading-ui.com/docs/components/text-dots)<br>`text-dots` | [![text-shimmer](https://loading-ui.com/api/og/components/text-shimmer/image.png)](https://loading-ui.com/docs/components/text-shimmer)<br>`text-shimmer` | [![text-shimmer-wave](https://loading-ui.com/api/og/components/text-shimmer-wave/image.png)](https://loading-ui.com/docs/components/text-shimmer-wave)<br>`text-shimmer-wave` |
 | [![triple-dot-spinner](https://loading-ui.com/api/og/components/triple-dot-spinner/image.png)](https://loading-ui.com/docs/components/triple-dot-spinner)<br>`triple-dot-spinner` | [![twin-orbit](https://loading-ui.com/api/og/components/twin-orbit/image.png)](https://loading-ui.com/docs/components/twin-orbit)<br>`twin-orbit` | [![typing](https://loading-ui.com/api/og/components/typing/image.png)](https://loading-ui.com/docs/components/typing)<br>`typing` |
-| [![wandering-eyes](https://loading-ui.com/api/og/components/wandering-eyes/image.png)](https://loading-ui.com/docs/components/wandering-eyes)<br>`wandering-eyes` | [![wave](https://loading-ui.com/api/og/components/wave/image.png)](https://loading-ui.com/docs/components/wave)<br>`wave` | [默认：ring](https://loading-ui.com/docs/components/ring)<br>`default` |
-| [Ant Design Spin](https://ant.design/components/spin)<br>`antd` |  |  |
+| [![wandering-eyes](https://loading-ui.com/api/og/components/wandering-eyes/image.png)](https://loading-ui.com/docs/components/wandering-eyes)<br>`wandering-eyes` | [![wave](https://loading-ui.com/api/og/components/wave/image.png)](https://loading-ui.com/docs/components/wave)<br>`wave` | [Ant Design Spin](https://ant.design/components/spin)<br>`default` |
 
 ## 关闭时机
 

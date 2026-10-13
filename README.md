@@ -78,9 +78,8 @@ if __name__ == "__main__":
   app.run(debug=True)
 ```
 
-When the `dash-antd-components` bundle is present, the plugin automatically
-uses Ant Design's four-dot loader unless `loader` is explicitly configured.
-Native Dash apps use the Loading UI `ring` loader by default.
+All apps use Ant Design's four-dot spinner through `loader="default"`.
+Use `setup(loader="ring")` to select the Loading UI ring.
 
 ### Theme behavior
 
@@ -94,11 +93,9 @@ operating system preference.
 ## Dash Ant Design
 
 Dash Ant Design is optional. The same `setup()` function configures native Dash
-and Dash Ant Design applications. When its component bundle is present and
-`loader` was not explicitly configured, the plugin uses Ant Design's four-dot
-loader and `colorPrimary` defaults. Other component libraries use Loading UI's
-`ring` loader by default. Explicit loader and color options always take
-precedence:
+and Dash Ant Design applications. The default four-dot spinner is bundled with
+the plugin and works without installing Dash Ant Design. Use loader and color
+options to customize its appearance:
 
 ```bash
 pip install dash-ant-design
@@ -111,7 +108,7 @@ uv add dash-ant-design
 ```python
 from dash_startup_loading_plugin import setup
 
-setup(loader="antd")
+setup(loader="default")
 ```
 
 ## Dismissal behavior
@@ -138,20 +135,19 @@ and callbacks.
 | `loader_dark_color` | `#1668dc` | Loader color in dark mode. |
 | `loader_text_color` | `rgba(0,0,0,0.88)` | Text color for `text-*` Loading UI loaders in light mode. |
 | `loader_dark_text_color` | `rgba(255,255,255,0.85)` | Text color for `text-*` Loading UI loaders in dark mode. |
-| `loader` | `"default"` | Loading UI's `ring` animation. |
+| `loader` | `"default"` | Ant Design's four-dot spinner. Use `"ring"` for the Loading UI ring. |
 | `loader_text` | `"Loading"` | Text rendered by `text-*` Loading UI loaders. |
-| `loader_size` | `64` | Target loader width and height. Loading UI uses its `ring` default of 4rem (64px); the `antd` loader uses Ant Design Spin's medium visual size of 20px. Other Loading UI loaders scale proportionally from their bundled default geometry. `None` uses the 64px baseline. |
-| `loader_stroke_width` | `2` | Loading UI border and SVG stroke width, generated from its 2px default at the 64px ring baseline. |
+| `loader_size` | `32` | Target size baseline. The default Ant Design spinner uses a 20px middle-size baseline; other standard loaders use 2rem (32px). The eight listed exceptions scale proportionally from their bundled geometry. `None` uses these defaults. |
+| `loader_stroke_width` | `2` | Loading UI border and SVG stroke width, generated from its 2px default at the 32px ring baseline. |
 | `custom_loader_html` | `None` | Trusted HTML replacing the default spinner. |
 
 `custom_loader_html` is inserted verbatim and must never contain untrusted
 user input.
 
-The default loader uses Loading UI's `ring` animation. To use Ant Design's
-four-dot loader, configure it explicitly:
+The default loader uses Ant Design's four-dot animation:
 
 ```python
-setup(loader="antd")
+setup(loader="default")
 ```
 
 The overlay selects `background` or `dark_background` according to the application's `html.dark` class. It does not read `--layout-bg` or ConfigProvider tokens. Use `loader_size`, `loader_color`, `loader_dark_color`, `loader_text_color`, and `loader_dark_text_color` to match a customized theme. Use `loader_text` to replace the default text in `text-*` loaders:
@@ -162,12 +158,12 @@ setup(loader="text-shimmer", loader_text="Preparing dashboard")
 
 ## Loader gallery
 
-The effective default depends on the component bundle:
+The default is the same for every component library:
 
 | Application | Default loader | Notes |
 | --- | --- | --- |
-| Native Dash components | `ring` | Loading UI renderer. |
-| `dash-antd-components` | `antd` | Ant Design's four-dot spinner. |
+| Native Dash components | `default` | Ant Design's four-dot spinner. |
+| `dash-antd-components` | `default` | Ant Design's four-dot spinner. |
 | Any app with an explicit `setup(loader=...)` | The selected loader | Explicit configuration always wins. |
 
 All Loading UI loaders are bundled separately and loaded only when selected.
@@ -193,8 +189,7 @@ custom text through `loader_text`; `loader_color`, `loader_dark_color`,
 | [![symmetric-wave](https://loading-ui.com/api/og/components/symmetric-wave/image.png)](https://loading-ui.com/docs/components/symmetric-wave)<br>`symmetric-wave` | [![terminal](https://loading-ui.com/api/og/components/terminal/image.png)](https://loading-ui.com/docs/components/terminal)<br>`terminal` | [![text-blink](https://loading-ui.com/api/og/components/text-blink/image.png)](https://loading-ui.com/docs/components/text-blink)<br>`text-blink` |
 | [![text-dots](https://loading-ui.com/api/og/components/text-dots/image.png)](https://loading-ui.com/docs/components/text-dots)<br>`text-dots` | [![text-shimmer](https://loading-ui.com/api/og/components/text-shimmer/image.png)](https://loading-ui.com/docs/components/text-shimmer)<br>`text-shimmer` | [![text-shimmer-wave](https://loading-ui.com/api/og/components/text-shimmer-wave/image.png)](https://loading-ui.com/docs/components/text-shimmer-wave)<br>`text-shimmer-wave` |
 | [![triple-dot-spinner](https://loading-ui.com/api/og/components/triple-dot-spinner/image.png)](https://loading-ui.com/docs/components/triple-dot-spinner)<br>`triple-dot-spinner` | [![twin-orbit](https://loading-ui.com/api/og/components/twin-orbit/image.png)](https://loading-ui.com/docs/components/twin-orbit)<br>`twin-orbit` | [![typing](https://loading-ui.com/api/og/components/typing/image.png)](https://loading-ui.com/docs/components/typing)<br>`typing` |
-| [![wandering-eyes](https://loading-ui.com/api/og/components/wandering-eyes/image.png)](https://loading-ui.com/docs/components/wandering-eyes)<br>`wandering-eyes` | [![wave](https://loading-ui.com/api/og/components/wave/image.png)](https://loading-ui.com/docs/components/wave)<br>`wave` | [Default: ring](https://loading-ui.com/docs/components/ring)<br>`default` |
-| [Ant Design Spin](https://ant.design/components/spin)<br>`antd` |  |  |
+| [![wandering-eyes](https://loading-ui.com/api/og/components/wandering-eyes/image.png)](https://loading-ui.com/docs/components/wandering-eyes)<br>`wandering-eyes` | [![wave](https://loading-ui.com/api/og/components/wave/image.png)](https://loading-ui.com/docs/components/wave)<br>`wave` | [Ant Design Spin](https://ant.design/components/spin)<br>`default` |
 
 The bundled [Loading UI](https://loading-ui.com/) collection supports all 47 loader names in the current upstream catalog:
 
@@ -208,7 +203,23 @@ For example:
 setup(loader="spiral", loader_color="#e91e63", loader_dark_color="#ff80ab")
 ```
 
-The default loader, `ring`, and other Loading UI loaders use a bundled, isolated renderer loaded before Dash starts. Each loader ships as its own bundle, and the index only references the selected one at `<requests_pathname_prefix>_dash-startup-loading/<loader>.js`. That keeps the HTML document small and lets the browser cache the renderer, so the choice of loader does not grow the first-screen payload. No other indicator is shown while that renderer starts. Loading UI loaders sit in a centered 4:3 region that uses full width below 640px, half width from 640px, one-third from 768px, and one-quarter from 1024px. Each loader keeps the geometry from its official demo: square icons use their documented `size-*`, rectangular loaders keep their documented aspect ratio, and character-grid loaders derive intrinsic `ch`/`em` dimensions from their default props. Text loaders fit their text.
+The default Ant Design spinner uses inline markup and CSS. The `ring` and other Loading UI loaders use a bundled, isolated renderer loaded before Dash starts. Each loader ships as its own bundle, and the index only references the selected one at `<requests_pathname_prefix>_dash-startup-loading/<loader>.js`. That keeps the HTML document small and lets the browser cache the renderer, so the choice of loader does not grow the first-screen payload. No other indicator is shown while that renderer starts. Loading UI loaders sit in a centered 4:3 region that uses full width below 640px, half width from 640px, one-third from 768px, and one-quarter from 1024px.
+
+Loader bundles are derived from the pinned Loading UI source with a small,
+one-shot DOM renderer. Each bundle includes only its own styles and animations;
+React, React DOM, Motion, and Tailwind's full utility stylesheet are not shipped.
+Motion-based loops are converted to native CSS keyframes or SVG path animations.
+Rebuild the resources with `python scripts/build_loading_ui.py` (requires Node.js
+and npm). The renderer targets this pinned catalog, not arbitrary React components.
+
+Most loaders use a 2rem × 2rem baseline. The default Ant Design spinner uses
+the 20px AntD Spin middle size. `infinity` and `morphing-infinity` use 3rem × 3rem. The four `text-*` loaders keep their original font sizes; `wave` uses
+3rem × 2rem; `triple-dot-spinner` and `twin-orbit` use 0.6rem × 0.6rem. The
+`swirling` retains its original 6rem × 6rem size. `accordion-loader`,
+`conveyor-loop`, `infinity-square-snake`, `infinity-track`, `square-accordion`,
+`square-grid`, `symmetric-wave`, and `square-snake` retain their original
+geometry.
+`loader_size` scales each loader relative to this baseline.
 
 ## Python API
 

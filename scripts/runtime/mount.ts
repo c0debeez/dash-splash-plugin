@@ -1,6 +1,5 @@
 // Shared entry-point runtime for every generated per-loader bundle.
-import React from "react";
-import { createRoot } from "react-dom/client";
+import { createElement, render } from "./loader-dom";
 
 const SHADOW_RESET =
   ":host{display:inline-block;width:100%;height:100%;color:inherit}" +
@@ -11,10 +10,10 @@ const SHADOW_RESET =
   "white-space:nowrap!important;border:0!important}";
 
 export interface LoaderBundle {
-  component: React.ComponentType<any>;
+  component: (props: any) => any;
   css: string;
   /** Geometry from the loader's official demo; empty when it is intrinsically sized. */
-  geometry: React.CSSProperties;
+  geometry: Record<string, string>;
   /** ``text-*`` loaders render the configured loading text as children. */
   usesText: boolean;
   /** Loaders that size themselves through ``style`` rather than a utility class. */
@@ -41,5 +40,5 @@ export function mount({ component, css, geometry, usesText, forwardsStyle }: Loa
     forwardsStyle && fillsTarget
       ? { style: { width: "100%", height: "100%" }, children }
       : { className: fillsTarget ? "size-full" : undefined, children };
-  createRoot(target).render(React.createElement(component, props));
+  render(createElement(component, props), target, style);
 }

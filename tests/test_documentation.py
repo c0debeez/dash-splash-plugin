@@ -45,7 +45,8 @@ def test_readmes_document_current_setup_and_installation():
         assert "index_string" in readme
         assert "prefers-color-scheme" in readme
         assert "dash_theme_component_id" not in readme
-        assert 'setup(loader="antd")' in readme
+        assert 'setup(loader="default")' in readme
+        assert 'setup(loader="antd")' not in readme
         assert "automatically uses the `antd`" not in readme
         assert "自动使用\n`antd` loader" not in readme
         assert "LOADING-UI-LICENSE" not in readme

@@ -1,7 +1,7 @@
 """Rebuild the bundled Loading UI renderers from the pinned MIT-licensed source.
 
-One self-contained IIFE bundle is emitted per loader so that a Dash index only
-ever inlines the renderer it actually uses.
+One self-contained IIFE bundle is emitted per loader, containing only its
+geometry, native animations and a small one-shot DOM renderer.
 """
 
 from __future__ import annotations
@@ -16,11 +16,6 @@ from pathlib import Path
 UPSTREAM = "https://github.com/turbostarter/loading-ui.git"
 COMMIT = "0ba63f89430d21c445edc6a771039288733462a9"
 PACKAGES = (
-    "react@19.3.0",
-    "react-dom@19.3.0",
-    "motion@12.43.0",
-    "clsx@2.1.1",
-    "tailwind-merge@3.7.0",
     "esbuild@0.28.2",
     "tailwindcss@4.3.3",
     "@tailwindcss/cli@4.3.3",
@@ -35,48 +30,48 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 RUNTIME = PROJECT_ROOT / "scripts/runtime"
 OUTPUT = RUNTIME / "loading-ui"
 
-# Default geometry used by each component's official demo. Components omitted
-# here calculate their own intrinsic ch/em dimensions from their default props.
+# Loaders use compact dimensions unless an entry preserves its demo geometry.
+# Components omitted here calculate their own intrinsic ch/em dimensions.
 COMPONENT_STYLES = {
-    "analyzing-image": {"width": "4rem", "height": "4rem"},
-    "arc": {"width": "3.5rem", "height": "3.5rem"},
-    "bars": {"width": "4rem", "height": "3rem"},
-    "bobbing-dots": {"width": "4rem"},
-    "bouncing-dots": {"width": "4rem"},
-    "classic": {"width": "4rem", "height": "4rem"},
-    "clock-ring": {"width": "3.5rem", "height": "3.5rem"},
-    "comet-spinner": {"width": "3rem", "height": "3rem"},
-    "concentric-ring": {"width": "3.5rem", "height": "3.5rem"},
-    "dash-ring": {"width": "3.5rem", "height": "3.5rem"},
-    "diamond": {"width": "2.5rem", "height": "2.5rem"},
-    "dots-ring": {"width": "4rem", "height": "4rem"},
-    "dots": {"width": "4.5rem"},
-    "dual-arc": {"width": "3.5rem", "height": "3.5rem"},
-    "fade-arc": {"width": "3.75rem", "height": "3.75rem"},
-    "infinity": {"width": "5rem", "height": "4rem"},
-    "morphing-infinity": {"width": "6rem", "height": "6rem"},
-    "orbit-ring": {"width": "3.5rem", "height": "3.5rem"},
-    "pulsating-dots": {"width": "4.5rem"},
-    "pulse-dot": {"width": "0.75rem", "height": "0.75rem"},
-    "pulse": {"width": "3.5rem", "height": "3.5rem"},
-    "quarter-ring": {"width": "3.5rem", "height": "3.5rem"},
-    "ring": {"width": "4rem", "height": "4rem"},
-    "ripple": {"width": "3.5rem", "height": "3.5rem"},
-    "satellite-ring": {"width": "3.5rem", "height": "3.5rem"},
-    "skeleton": {"width": "4rem", "height": "4rem"},
-    "spiral": {"width": "4.5rem", "height": "4.5rem"},
-    "spokes": {"width": "4rem", "height": "4rem"},
+    "analyzing-image": {"width": "2rem", "height": "2rem"},
+    "arc": {"width": "2rem", "height": "2rem"},
+    "bars": {"width": "2rem", "height": "2rem"},
+    "bobbing-dots": {"width": "2rem", "height": "2rem"},
+    "bouncing-dots": {"width": "2rem", "height": "2rem"},
+    "classic": {"width": "2rem", "height": "2rem"},
+    "clock-ring": {"width": "2rem", "height": "2rem"},
+    "comet-spinner": {"width": "2rem", "height": "2rem"},
+    "concentric-ring": {"width": "2rem", "height": "2rem"},
+    "dash-ring": {"width": "2rem", "height": "2rem"},
+    "diamond": {"width": "2rem", "height": "2rem"},
+    "dots-ring": {"width": "2rem", "height": "2rem"},
+    "dots": {"width": "2rem", "height": "2rem"},
+    "dual-arc": {"width": "2rem", "height": "2rem"},
+    "fade-arc": {"width": "2rem", "height": "2rem"},
+    "infinity": {"width": "3rem", "height": "3rem"},
+    "morphing-infinity": {"width": "3rem", "height": "3rem"},
+    "orbit-ring": {"width": "2rem", "height": "2rem"},
+    "pulsating-dots": {"width": "2rem", "height": "2rem"},
+    "pulse-dot": {"width": "2rem", "height": "2rem"},
+    "pulse": {"width": "2rem", "height": "2rem"},
+    "quarter-ring": {"width": "2rem", "height": "2rem"},
+    "ring": {"width": "2rem", "height": "2rem"},
+    "ripple": {"width": "2rem", "height": "2rem"},
+    "satellite-ring": {"width": "2rem", "height": "2rem"},
+    "skeleton": {"width": "2rem", "height": "2rem"},
+    "spiral": {"width": "2rem", "height": "2rem"},
+    "spokes": {"width": "2rem", "height": "2rem"},
     "swirling": {"width": "6rem", "height": "6rem"},
-    "terminal": {"fontSize": "1.25rem"},
+    "terminal": {"width": "2rem", "height": "2rem", "fontSize": "1.25rem"},
     "text-blink": {"fontSize": "1.25rem"},
     "text-dots": {"fontSize": "1.25rem", "fontWeight": "500"},
     "text-shimmer-wave": {"fontSize": "1.25rem", "fontWeight": "500"},
     "text-shimmer": {"fontSize": "1.25rem", "fontWeight": "500"},
-    "triple-dot-spinner": {"width": "0.875rem", "height": "0.875rem"},
-    "twin-orbit": {"width": "1.125rem", "height": "1.125rem"},
-    "typing": {"width": "4rem"},
-    "wandering-eyes": {"width": "180px", "height": "5rem"},
-    "wave": {"width": "6rem", "height": "3rem"},
+    "triple-dot-spinner": {"width": "0.6rem", "height": "0.6rem"},
+    "twin-orbit": {"width": "0.6rem", "height": "0.6rem"},
+    "typing": {"width": "2rem", "height": "2rem"},
+    "wandering-eyes": {"width": "2rem", "height": "2rem"},
+    "wave": {"width": "3rem", "height": "2rem"},
 }
 
 # Loaders whose root element is sized through ``style`` rather than a class.
@@ -104,12 +99,12 @@ def component_symbol(stem: str) -> str:
     return "".join(part.title() for part in stem.split("-"))
 
 
-def entry_source(name: str, component: Path, mount_module: Path) -> str:
+def entry_source(name: str, component: Path, mount_module: Path, stylesheet: Path) -> str:
     symbol = component_symbol(name)
     return (
         f'import {{ {symbol} }} from "{component}";\n'
         f'import {{ mount }} from "{mount_module}";\n'
-        'import css from "./loading-ui.css";\n'
+        f'import css from "{stylesheet}";\n'
         "mount({\n"
         f"  component: {symbol},\n"
         "  css,\n"
@@ -170,18 +165,20 @@ def main() -> None:
 
         mount_module = build / "mount.ts"
         shutil.copyfile(RUNTIME / "mount.ts", mount_module)
+        for module in ("loader-dom.ts", "loader-motion.ts"):
+            shutil.copyfile(RUNTIME / module, build / module)
         entries = build / "entries"
         entries.mkdir()
-        shutil.copyfile(stylesheet, entries / "loading-ui.css")
         names = sorted(path.stem for path in components.glob("*.tsx"))
         for name in names:
             (entries / f"{name}.tsx").write_text(
-                entry_source(name, components / f"{name}.tsx", mount_module),
+                entry_source(name, components / f"{name}.tsx", mount_module,
+                             build / f"loader-class-styles-{name}.css"),
                 encoding="utf-8",
             )
 
-        shutil.rmtree(OUTPUT, ignore_errors=True)
-        OUTPUT.mkdir(parents=True)
+        # Complete the build before replacing existing generated resources.
+        bundled = build / "bundled"
         run(
             str(build / "node_modules/.bin/esbuild"),
             *(str(entries / f"{name}.tsx") for name in names),
@@ -190,10 +187,20 @@ def main() -> None:
             "--legal-comments=none",
             "--format=iife",
             "--platform=browser",
-            f"--alias:@/lib/utils={source / 'registry/lib/utils.ts'}",
+            '--tsconfig-raw={"compilerOptions":{"jsx":"react"}}',
+            "--jsx=transform",
+            "--jsx-factory=createElement",
+            "--jsx-fragment=Fragment",
+            f"--inject:{build / 'loader-dom.ts'}",
+            f"--alias:react={build / 'loader-dom.ts'}",
+            f"--alias:motion/react={build / 'loader-motion.ts'}",
+            f"--alias:@/lib/utils={build / 'loader-dom.ts'}",
             "--loader:.css=text",
-            f"--outdir={OUTPUT}",
+            f"--outdir={bundled}",
         )
+        OUTPUT.mkdir(parents=True, exist_ok=True)
+        for resource in bundled.glob("*.js"):
+            shutil.copyfile(resource, OUTPUT / resource.name)
 
     subprocess.run(
         [sys.executable, str(PROJECT_ROOT / "scripts/build_startup_runtime.py")],

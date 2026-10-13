@@ -28,23 +28,18 @@ _HEAD_END_PATTERN = re.compile(r"</head\s*>", flags=re.IGNORECASE)
 _START_SCRIPT = "<script>if (window.__dashStartupLoadingStart){window.__dashStartupLoadingStart()}</script>"
 _LOADER_CACHE_CONTROL = "public, max-age=31536000, immutable"
 _DEFAULT_PATHNAME_PREFIX = "/"
-_ANTD_BUNDLE_MARKER = "dash_antd_components"
 
 _CONFIG_LOCK = RLock()
 _dash_server: WeakKeyDictionary[Any, list[Any]] = WeakKeyDictionary()
-_explicit_options: frozenset[str] = frozenset()
 
-_LOADING_UI_DEFAULT_SIZE = 64
+_LOADING_UI_DEFAULT_SIZE = 32
 _LOADING_UI_DEFAULT_STROKE_WIDTH = 2
-_LOADING_UI_DEFAULT_LOADER = "ring"
-_ANTD_SPIN_DEFAULT_SIZE = 20
 _LIGHT_LOADER_COLOR = "#1677ff"
 _DARK_LOADER_COLOR = "#1668dc"
 _LIGHT_TEXT_COLOR = "rgba(0,0,0,0.88)"
 _DARK_TEXT_COLOR = "rgba(255,255,255,0.85)"
 LoaderName = Literal[
     "default",
-    "antd",
     "accordion-loader",
     "analyzing-image",
     "arc",
@@ -94,7 +89,7 @@ LoaderName = Literal[
     "wave",
 ]
 _LOADER_NAMES = frozenset(get_args(LoaderName))
-_LOADING_UI_LOADERS = _LOADER_NAMES - {"default", "antd"}
+_LOADING_UI_LOADERS = _LOADER_NAMES - {"default"}
 _COLOR_OPTIONS = (
     "loader_color",
     "loader_dark_color",
@@ -194,7 +189,7 @@ def _validate(config: StartupLoadingConfig) -> StartupLoadingConfig:
     if not isinstance(config.enabled, bool):
         raise TypeError("enabled must be a boolean")
     if config.loader not in _LOADER_NAMES:
-        raise ValueError("loader must be a Loading UI loader name, 'default', or 'antd'")
+        raise ValueError("loader must be a Loading UI loader name or 'default'")
     if not isinstance(config.loader_text, str) or not config.loader_text.strip():
         raise ValueError("loader_text must be a non-empty string")
     for name in ("background", "dark_background"):
@@ -221,10 +216,9 @@ def setup(**changes: Unpack[SetupOptions]) -> StartupLoadingConfig:
     if unknown:
         names = ", ".join(sorted(unknown))
         raise TypeError(f"Unknown startup loading option(s): {names}")
-    global _config, _explicit_options
+    global _config
     with _CONFIG_LOCK:
         _config = _validate(replace(_config, **changes))
-        _explicit_options = _explicit_options.union(changes)
         return _config
 
 
@@ -235,18 +229,12 @@ def get_config() -> StartupLoadingConfig:
         return _config
 
 
-def _configuration_state() -> tuple[StartupLoadingConfig, frozenset[str]]:
-    with _CONFIG_LOCK:
-        return _config, _explicit_options
-
-
 def reset_config() -> StartupLoadingConfig:
     """Restore the default configuration, primarily for tests."""
 
-    global _config, _explicit_options
+    global _config
     with _CONFIG_LOCK:
         _config = _DEFAULT_CONFIG
-        _explicit_options = frozenset()
         return _config
 
 
@@ -270,6 +258,7 @@ def _overlay_styles(config: StartupLoadingConfig, loader: str) -> dict[str, str]
     visuals = _resolved_visuals(config)
     size = _LOADING_UI_DEFAULT_SIZE if config.loader_size is None else config.loader_size
     scale = size / _LOADING_UI_DEFAULT_SIZE
+    rendered_size = size * 20 / _LOADING_UI_DEFAULT_SIZE if loader == "default" else size
     # Loading UI draws at its own baseline, so the stroke is pre-divided by the scale.
     loading_ui_stroke = config.loader_stroke_width / scale if scale > 0 else config.loader_stroke_width
     styles = {
@@ -279,7 +268,7 @@ def _overlay_styles(config: StartupLoadingConfig, loader: str) -> dict[str, str]
         "--dash-loading-loader-dark-color": visuals.loader_dark_color,
         "--dash-loading-loader-text-color": visuals.text_color,
         "--dash-loading-loader-dark-text-color": visuals.dark_text_color,
-        "--dash-loading-size": f"{size}px",
+        "--dash-loading-size": f"{rendered_size:g}px",
         "--dash-loading-scale": f"{scale:g}",
         "--dash-loading-ui-display": "none" if scale == 0 else "inline-flex",
         "--dash-loading-stroke": f"{config.loader_stroke_width}px",
@@ -287,15 +276,11 @@ def _overlay_styles(config: StartupLoadingConfig, loader: str) -> dict[str, str]
         "--dash-loading-z-index": str(config.z_index),
         "--dash-loading-fade-duration": "0ms",
     }
-    if loader == "antd":
-        styles["--dash-loading-antd-scale"] = (
-            f"{_ANTD_SPIN_DEFAULT_SIZE / config.loader_size:g}" if config.loader_size else "1"
-        )
     return styles
 
 
 def _loader_markup(config: StartupLoadingConfig, loader: str) -> str:
-    if loader == "antd":
+    if loader == "default":
         return (
             '<span class="dash-loading__antd-spinner" aria-hidden="true">'
             '<span class="dash-loading__antd-dot">'
@@ -374,23 +359,15 @@ def _with_startup_runtime(head: str) -> str:
     return head[: head_end.start()] + runtime + head[head_end.start() :]
 
 
-def _selected_loader(config: StartupLoadingConfig, explicit_options: frozenset[str], app_index: str) -> str:
-    """Resolve the configured loader, defaulting to Ant Design's when its bundle is present."""
-
-    if _ANTD_BUNDLE_MARKER in app_index and "loader" not in explicit_options:
-        return "antd"
-    return _LOADING_UI_DEFAULT_LOADER if config.loader == "default" else config.loader
-
-
 def _inject_overlay(app_index: str) -> str:
-    config, explicit_options = _configuration_state()
+    config = get_config()
     if not config.enabled or _OVERLAY_MARKER in app_index:
         return app_index
     body = _BODY_PATTERN.search(app_index)
     if body is None:
         return app_index
 
-    loader = _selected_loader(config, explicit_options, app_index)
+    loader = config.loader
     scripts = ""
     if config.custom_loader_html is None and loader in _LOADING_UI_LOADERS:
         scripts = _loading_ui_script(loader)

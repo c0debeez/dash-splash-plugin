@@ -1,5 +1,5 @@
 // Convert Loading UI's Tailwind utility classes to React style props at build time.
-// The compiled stylesheet remains for keyframes and CSS property definitions.
+// Each loader gets only its own class styles, keyframes and variable defaults.
 
 const fs = require("node:fs");
 const path = require("node:path");
@@ -79,7 +79,8 @@ for (const file of fs.readdirSync(componentsDir).filter((name) => name.endsWith(
   }
 }
 
-const helper = `const styles = ${JSON.stringify(styles)};\n` +
+function helperSource(selected) {
+  return `const styles = ${JSON.stringify(selected)};\n` +
   `export function mergeClassStyle(classes, existing) {\n` +
   `  const result = {};\n` +
   `  if (typeof classes === "string") {\n` +
@@ -87,7 +88,36 @@ const helper = `const styles = ${JSON.stringify(styles)};\n` +
   `  }\n` +
   `  return Object.assign(result, existing || {});\n` +
   `}\n`;
-fs.writeFileSync(helperFile, helper);
+}
+
+function stylesheetFor(source) {
+  const variables = new Set([...source.matchAll(/var\((--[\w-]+)/g)].map((match) => match[1]));
+  // Defaults may refer to other defaults (e.g. a shadow's Tailwind variables).
+  for (const name of variables) {
+    for (const match of (customPropertyDefaults[name] || "").matchAll(/var\((--[\w-]+)/g)) variables.add(match[1]);
+  }
+  const root = postcss.parse(generatedCss);
+  root.walkAtRules("keyframes", (rule) => { if (!source.includes(rule.params)) rule.remove(); });
+  root.walkAtRules("property", (rule) => { if (!variables.has(rule.params)) rule.remove(); });
+  root.walkRules((rule) => {
+    if (rule.parent.type === "atrule" && rule.parent.name === "keyframes") return;
+    // Utility classes have been inlined. Keep only the required variable defaults.
+    if (!rule.selector.includes(":root") && !rule.selector.includes(":host") && !rule.selector.startsWith("*")) {
+      rule.remove();
+      return;
+    }
+    rule.walkDecls((decl) => { if (!variables.has(decl.prop)) decl.remove(); });
+    if (!rule.nodes.length) rule.remove();
+  });
+  function removeEmpty(node) {
+    for (const child of [...(node.nodes || [])]) {
+      removeEmpty(child);
+      if (child.type === "comment" || (child.nodes && !child.nodes.length)) child.remove();
+    }
+  }
+  removeEmpty(root);
+  return root.toString();
+}
 
 let converted = 0;
 const unknown = new Set();
@@ -95,6 +125,8 @@ for (const file of fs.readdirSync(componentsDir).filter((name) => name.endsWith(
   const filepath = path.join(componentsDir, file);
   const source = fs.readFileSync(filepath, "utf8");
   const ast = parser.parse(source, { sourceType: "module", plugins: ["typescript", "jsx"] });
+  const usedClasses = new Set(["size-full"]);
+  const perLoaderHelper = helperFile.replace(/\.ts$/, `-${path.basename(file, ".tsx")}.ts`);
   let fileConverted = 0;
   traverse(ast, {
     JSXOpeningElement(nodePath) {
@@ -106,6 +138,11 @@ for (const file of fs.readdirSync(componentsDir).filter((name) => name.endsWith(
         ? t.stringLiteral(classAttr.value.value)
         : classAttr.value?.expression || t.nullLiteral();
       const styleExpression = styleAttr?.value?.expression || t.nullLiteral();
+      t.traverseFast(classExpression, (node) => {
+        if (t.isStringLiteral(node)) {
+          for (const name of node.value.split(/\s+/)) if (name) usedClasses.add(name);
+        }
+      });
 
       if (t.isStringLiteral(classExpression)) {
         for (const name of classExpression.value.split(/\s+/)) {
@@ -126,10 +163,14 @@ for (const file of fs.readdirSync(componentsDir).filter((name) => name.endsWith(
   if (fileConverted) {
     ast.program.body.unshift(t.importDeclaration(
       [t.importSpecifier(t.identifier("mergeClassStyle"), t.identifier("mergeClassStyle"))],
-      t.stringLiteral(helperFile),
+      t.stringLiteral(perLoaderHelper),
     ));
     fs.writeFileSync(filepath, generate(ast, { retainLines: true }).code);
   }
+  const selected = Object.fromEntries([...usedClasses].filter((name) => styles[name]).map((name) => [name, styles[name]]));
+  const helper = helperSource(selected);
+  fs.writeFileSync(perLoaderHelper, helper);
+  fs.writeFileSync(perLoaderHelper.replace(/\.ts$/, ".css"), stylesheetFor(source + helper));
 }
 
 if (unknown.size) {

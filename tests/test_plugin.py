@@ -47,9 +47,9 @@ def test_injects_overlay_after_body_with_custom_attributes():
     assert result.index('class="dash-loading"') < result.rindex("window.__dashStartupLoadingStart")
     assert result.count(" data-dash-loading ") == 1
     assert '<span class="dash-loading__spinner" aria-hidden="true"></span>' not in result
-    assert '<span class="dash-loading__antd-dot">' not in result
-    assert 'data-dash-loading-resource="loading-ui"' in result
-    assert "--dash-loading-size:64px" in result
+    assert '<span class="dash-loading__antd-dot">' in result
+    assert 'data-dash-loading-resource="loading-ui"' not in result
+    assert "--dash-loading-size:20px" in result
     assert "--dash-loading-stroke:2px" in result
     assert "--dash-loading-background:#f5f5f5" in result
     assert "--dash-loading-dark-background:#000" in result
@@ -94,13 +94,12 @@ def test_custom_loader_html_is_intentionally_preserved():
     assert '<div class="brand-loader">Please wait</div>' in result
 
 
-def test_default_loader_uses_the_loading_ui_ring():
+def test_default_loader_uses_the_ant_design_spinner():
     result = _inject_overlay("<html><body></body></html>")
-
     assert get_config().loader == "default"
-    assert 'data-dash-loading-ui="ring"' in result
-    assert '<svg class="dash-loading__ring"' not in result
-    assert "_dash-startup-loading/ring.js" in result
+    assert '<span class="dash-loading__antd-dot">' in result
+    assert 'data-dash-loading-ui=' not in result
+    assert 'data-dash-loading-resource="loading-ui"' not in result
 
 
 def test_dash_builtin_loading_message_stays_hidden_after_overlay_removal():
@@ -111,42 +110,43 @@ def test_dash_builtin_loading_message_stays_hidden_after_overlay_removal():
     assert ".dash-loading ~" not in runtime
 
 
-def test_antd_spinner_uses_12px_as_its_scaled_visual_baseline():
-    setup(loader="antd")
+def test_default_spinner_respects_the_configured_size():
+    setup(loader="default")
     result = _inject_overlay("<html><body></body></html>")
     runtime = startup_runtime()
 
     assert '<span class="dash-loading__antd-dot">' in result
     assert "<i></i><i></i><i></i><i></i>" in result
-    assert "--dash-loading-size:64px" in result
+    assert "--dash-loading-size:20px" in result
     assert "transform:scale(var(--dash-loading-antd-scale,1))" in runtime
     assert "transform-origin:center" in runtime
     assert "--dash-loading-loader-color:#1677ff" in result
     assert "--dash-loading-loader-dark-color:#1668dc" in result
-    assert "--dash-loading-antd-scale:0.3125" in result
+    assert "--dash-loading-antd-scale:" not in result
 
     setup(loader_size=20)
     result = _inject_overlay("<html><body></body></html>")
-    assert "--dash-loading-size:20px" in result
-    assert "--dash-loading-antd-scale:1" in result
+    assert "--dash-loading-size:12.5px" in result
+    assert "--dash-loading-antd-scale:" not in result
 
     setup(loader_size=32)
     result = _inject_overlay("<html><body></body></html>")
-    assert "--dash-loading-size:32px" in result
-    assert "--dash-loading-antd-scale:0.625" in result
+    assert "--dash-loading-size:20px" in result
+    assert "--dash-loading-antd-scale:" not in result
 
 
 def test_antd_default_size_override_does_not_affect_other_loaders():
-    setup(loader="default")
+    setup(loader="ring")
     result = _inject_overlay("<html><body></body></html>")
 
-    assert "--dash-loading-size:64px" in result
+    assert "--dash-loading-size:32px" in result
     assert '<span class="dash-loading__antd-spinner"' not in result
 
 
-def test_invalid_loader_is_rejected():
+@pytest.mark.parametrize("loader", ["unknown", "antd"])
+def test_invalid_loader_is_rejected(loader):
     with pytest.raises(ValueError, match="loader"):
-        setup(loader="unknown")
+        setup(loader=loader)
 
 
 @pytest.mark.parametrize("name", ["spokes", "classic", "dots-ring", "spiral", "wave", "text-shimmer"])
@@ -158,7 +158,7 @@ def test_loading_ui_loader_is_mounted_before_dash_runtime(name):
     assert f'data-dash-loading-ui="{name}"' in result
     assert '<svg class="dash-loading__ring"' not in result
     assert '<div class="dash-loading__spinner-region">' in result
-    assert "--dash-loading-size:64px" in result
+    assert "--dash-loading-size:32px" in result
     assert 'data-dash-loading-resource="startup"' in result
     assert "--dash-loading-loader-color:#e91e63" in result
     assert "--dash-loading-loader-dark-color:#ff80ab" in result
@@ -172,23 +172,31 @@ def test_loading_ui_uses_official_component_geometry_and_border_box():
     core_runtime = startup_runtime()
 
     assert ".dash-loading__loading-ui" in core_runtime
-    assert 'width:"3.5rem",height:"3.5rem"' in runtime
+    assert 'width:"2rem",height:"2rem"' in runtime
     assert "display:inline-flex;width:auto;height:auto" in runtime
     assert "box-sizing:border-box" in runtime
     assert "border-width:var(--dash-loading-ui-stroke,2px)!important" in runtime
     assert "stroke-width:var(--dash-loading-ui-stroke,2px)!important" in runtime
-    assert "--dash-loading-size:64px" in result
+    assert "--dash-loading-size:32px" in result
     assert "--dash-loading-scale:1" in result
     assert "--dash-loading-ui-stroke:2px" in result
 
-    assert 'width:"180px",height:"5rem"' in loading_ui_runtime("wandering-eyes")
+    assert 'width:"2rem",height:"2rem"' in loading_ui_runtime("wandering-eyes")
     assert 'fontSize:"1.25rem"' in loading_ui_runtime("text-blink")
+    assert 'geometry:{fontSize:"1.25rem"}' in loading_ui_runtime("text-blink")
+    assert 'geometry:{fontSize:"1.25rem",fontWeight:"500"}' in loading_ui_runtime("text-dots")
+    assert 'geometry:{fontSize:"1.25rem",fontWeight:"500"}' in loading_ui_runtime("text-shimmer")
+    assert 'geometry:{fontSize:"1.25rem",fontWeight:"500"}' in loading_ui_runtime("text-shimmer-wave")
+    assert 'geometry:{width:"0.6rem",height:"0.6rem"}' in loading_ui_runtime("triple-dot-spinner")
+    assert 'geometry:{width:"0.6rem",height:"0.6rem"}' in loading_ui_runtime("twin-orbit")
+    assert 'geometry:{width:"3rem",height:"2rem"}' in loading_ui_runtime("wave")
+    assert 'geometry:{width:"6rem",height:"6rem"}' in loading_ui_runtime("swirling")
 
     setup(loader="wave", loader_size=40)
     result = _inject_overlay("<html><body></body></html>")
     assert "--dash-loading-size:40px" in result
-    assert "--dash-loading-scale:0.625" in result
-    assert "--dash-loading-ui-stroke:3.2px" in result
+    assert "--dash-loading-scale:1.25" in result
+    assert "--dash-loading-ui-stroke:1.6px" in result
 
     setup(loader="wave", loader_size=0)
     result = _inject_overlay("<html><body></body></html>")
@@ -245,7 +253,7 @@ def test_dash_antd_bundle_uses_the_plugin_default_loader_without_setup():
     assert 'data-dash-loading-resource="startup"' in result
     assert "--dash-loading-loader-color:#1677ff" in result
     assert "--dash-loading-loader-dark-color:#1668dc" in result
-    assert "--dash-loading-antd-scale:0.3125" in result
+    assert "--dash-loading-antd-scale:" not in result
 
 
 def test_dash_antd_bundle_does_not_read_config_provider_tokens():
@@ -289,7 +297,7 @@ def test_explicit_loader_applies_with_a_dash_antd_bundle():
     assert "--dash-loading-loader-dark-color:#1668dc" in result
 
 
-def test_explicit_default_loader_keeps_loading_ui_ring_with_dash_antd_bundle():
+def test_explicit_default_loader_uses_ant_design_spinner_with_dash_antd_bundle():
     setup(loader="default")
     index = (
         '<html><head><script src="/_dash-component-suites/'
@@ -298,8 +306,8 @@ def test_explicit_default_loader_keeps_loading_ui_ring_with_dash_antd_bundle():
 
     result = _inject_overlay(index)
 
-    assert 'data-dash-loading-ui="ring"' in result
-    assert '<span class="dash-loading__antd-dot">' not in result
+    assert 'data-dash-loading-ui="ring"' not in result
+    assert '<span class="dash-loading__antd-dot">' in result
 
 
 def test_explicit_colors_apply_with_the_default_loader_and_dash_antd_bundle():
@@ -312,7 +320,7 @@ def test_explicit_colors_apply_with_the_default_loader_and_dash_antd_bundle():
     result = _inject_overlay(index)
 
     assert '<span class="dash-loading__antd-dot">' in result
-    assert "--dash-loading-antd-scale:0.3125" in result
+    assert "--dash-loading-antd-scale:" not in result
     assert "--dash-loading-loader-color:#e91e63" in result
     assert "--dash-loading-loader-dark-color:#ff80ab" in result
 
@@ -324,7 +332,7 @@ def test_loading_ui_ring_uses_responsive_region_and_accepts_fixed_size():
         '<div class="dash-loading__spinner-region"><span class="dash-loading__loading-ui" data-dash-loading-ui="ring"'
         in result
     )
-    assert "--dash-loading-size:64px" in result
+    assert "--dash-loading-size:32px" in result
     assert "--dash-loading-loader-color:#1677ff" in result
 
     setup(loader_size=36)
@@ -333,7 +341,7 @@ def test_loading_ui_ring_uses_responsive_region_and_accepts_fixed_size():
 
     setup(loader_size=None)
     result = _inject_overlay("<html><body></body></html>")
-    assert "--dash-loading-size:64px" in result
+    assert "--dash-loading-size:32px" in result
     assert "--dash-loading-scale:1" in result
 
 
