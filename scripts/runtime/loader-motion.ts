@@ -8,6 +8,27 @@ const transforms: Record<string, string> = {
 };
 const easing: Record<string, string> = { linear: "linear", easeInOut: "cubic-bezier(.42,0,.58,1)" };
 let nextAnimation = 0;
+const coloredElements = new Set<Element>();
+let colorObserver: MutationObserver | undefined;
+function trackColor(element: Element): void {
+  const refresh = () => {
+    const host = (element.getRootNode() as ShadowRoot).host;
+    setStyle(element, { "--loading-ui-motion-foreground": getComputedStyle(host).color });
+  };
+  refresh();
+  coloredElements.add(element);
+  if (!colorObserver) {
+    colorObserver = new MutationObserver(() => {
+      for (const item of coloredElements) {
+        if (!item.isConnected) { coloredElements.delete(item); continue; }
+        const host = (item.getRootNode() as ShadowRoot).host;
+        setStyle(item, { "--loading-ui-motion-foreground": getComputedStyle(host).color });
+      }
+      if (!coloredElements.size) { colorObserver?.disconnect(); colorObserver = undefined; }
+    });
+    colorObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+  }
+}
 
 function declarations(values: Record<string, any>): Record<string, any> {
   const styles: Record<string, any> = {};
@@ -31,9 +52,10 @@ function animate(element: Element, stylesheet: HTMLStyleElement, initial: any, v
   // Resolve inherited color variables once, as Motion does. Leaving currentColor
   // inside an animated color-mix would apply the base opacity twice.
   const computed = getComputedStyle(element);
+  if (values.color) trackColor(element);
   const resolve = (key: string, value: any) => key === "color" && typeof value === "string"
     ? value.replace(/var\((--[\w-]+)\)/g, (_, name) => computed.getPropertyValue(name).trim())
-      .replace(/currentColor/gi, computed.color) : value;
+      .replace(/currentColor/gi, "var(--loading-ui-motion-foreground)") : value;
   initial = Object.fromEntries(Object.entries(initial || {}).map(([key, value]) => [key, resolve(key, value)]));
   const tracks = Object.fromEntries(Object.entries(values).map(([key, value]) => [key,
     (Array.isArray(value) ? value : [initial[key] ?? value, value]).map((frame) => resolve(key, frame))]));

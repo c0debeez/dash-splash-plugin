@@ -27,9 +27,9 @@ def test_readmes_document_current_setup_and_installation():
         assert "overlay_id" not in readme
         assert "spinner_size_px" not in readme
         assert "spinner_stroke_px" not in readme
-        assert "loader_size" in readme
-        assert "loader_stroke_width" in readme
-        assert "loader_text" in readme
+        assert "size" in readme
+        assert "thickness" in readme
+        assert "text" in readme
         assert "html.dark" in readme
         assert "theme_store" not in readme
         assert "sync_theme" not in readme

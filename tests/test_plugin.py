@@ -49,14 +49,14 @@ def test_injects_overlay_after_body_with_custom_attributes():
     assert '<span class="dash-loading__spinner" aria-hidden="true"></span>' not in result
     assert '<span class="dash-loading__antd-dot">' in result
     assert 'data-dash-loading-resource="loading-ui"' not in result
-    assert "--dash-loading-size:20px" in result
-    assert "--dash-loading-stroke:2px" in result
+    assert "--dash-loading-size:32px" in result
+    assert "--dash-loading-stroke:" not in result
     assert "--dash-loading-background:#f5f5f5" in result
     assert "--dash-loading-dark-background:#000" in result
-    assert "--dash-loading-loader-color:#1677ff" in result
-    assert "--dash-loading-loader-dark-color:#1668dc" in result
-    assert "--dash-loading-loader-text-color:rgba(0,0,0,0.88)" in result
-    assert "--dash-loading-loader-dark-text-color:rgba(255,255,255,0.85)" in result
+    assert "--dash-loading-loader-color:currentColor" in result
+    assert "--dash-loading-loader-dark-color:currentColor" in result
+    assert "--dash-loading-loader-text-color:currentColor" in result
+    assert "--dash-loading-loader-dark-text-color:currentColor" in result
     assert "data-config=" not in result
 
 
@@ -117,21 +117,21 @@ def test_default_spinner_respects_the_configured_size():
 
     assert '<span class="dash-loading__antd-dot">' in result
     assert "<i></i><i></i><i></i><i></i>" in result
-    assert "--dash-loading-size:20px" in result
+    assert "--dash-loading-size:32px" in result
     assert "transform:scale(var(--dash-loading-antd-scale,1))" in runtime
     assert "transform-origin:center" in runtime
-    assert "--dash-loading-loader-color:#1677ff" in result
-    assert "--dash-loading-loader-dark-color:#1668dc" in result
+    assert "--dash-loading-loader-color:currentColor" in result
+    assert "--dash-loading-loader-dark-color:currentColor" in result
     assert "--dash-loading-antd-scale:" not in result
 
-    setup(loader_size=20)
-    result = _inject_overlay("<html><body></body></html>")
-    assert "--dash-loading-size:12.5px" in result
-    assert "--dash-loading-antd-scale:" not in result
-
-    setup(loader_size=32)
+    setup(size=20)
     result = _inject_overlay("<html><body></body></html>")
     assert "--dash-loading-size:20px" in result
+    assert "--dash-loading-antd-scale:" not in result
+
+    setup(size=32)
+    result = _inject_overlay("<html><body></body></html>")
+    assert "--dash-loading-size:32px" in result
     assert "--dash-loading-antd-scale:" not in result
 
 
@@ -151,7 +151,7 @@ def test_invalid_loader_is_rejected(loader):
 
 @pytest.mark.parametrize("name", ["spokes", "classic", "dots-ring", "spiral", "wave", "text-shimmer"])
 def test_loading_ui_loader_is_mounted_before_dash_runtime(name):
-    setup(loader=name, loader_color="#e91e63", loader_dark_color="#ff80ab")
+    setup(loader=name, color="#e91e63", dark_color="#ff80ab")
 
     result = _inject_overlay("<html><head></head><body></body></html>")
 
@@ -175,11 +175,10 @@ def test_loading_ui_uses_official_component_geometry_and_border_box():
     assert 'width:"2rem",height:"2rem"' in runtime
     assert "display:inline-flex;width:auto;height:auto" in runtime
     assert "box-sizing:border-box" in runtime
-    assert "border-width:var(--dash-loading-ui-stroke,2px)!important" in runtime
-    assert "stroke-width:var(--dash-loading-ui-stroke,2px)!important" in runtime
+    assert "--dash-loading-thickness" in runtime
     assert "--dash-loading-size:32px" in result
     assert "--dash-loading-scale:1" in result
-    assert "--dash-loading-ui-stroke:2px" in result
+    assert "--dash-loading-stroke:" not in result
 
     assert 'width:"2rem",height:"2rem"' in loading_ui_runtime("wandering-eyes")
     assert 'fontSize:"1.25rem"' in loading_ui_runtime("text-blink")
@@ -190,29 +189,29 @@ def test_loading_ui_uses_official_component_geometry_and_border_box():
     assert 'geometry:{width:"0.6rem",height:"0.6rem"}' in loading_ui_runtime("triple-dot-spinner")
     assert 'geometry:{width:"0.6rem",height:"0.6rem"}' in loading_ui_runtime("twin-orbit")
     assert 'geometry:{width:"3rem",height:"2rem"}' in loading_ui_runtime("wave")
-    assert 'geometry:{width:"6rem",height:"6rem"}' in loading_ui_runtime("swirling")
+    assert 'geometry:{width:"48px",height:"48px"}' in loading_ui_runtime("swirling")
 
-    setup(loader="wave", loader_size=40)
+    setup(loader="wave", size=40)
     result = _inject_overlay("<html><body></body></html>")
     assert "--dash-loading-size:40px" in result
-    assert "--dash-loading-scale:1.25" in result
-    assert "--dash-loading-ui-stroke:1.6px" in result
+    assert "--dash-loading-target-size:40" in result
+    assert "--dash-loading-stroke:" not in result
 
-    setup(loader="wave", loader_size=0)
+    setup(loader="wave", size=0)
     result = _inject_overlay("<html><body></body></html>")
-    assert "--dash-loading-scale:0" in result
+    assert "--dash-loading-target-size:0" in result
     assert "--dash-loading-ui-display:none" in result
 
 
 def test_loading_ui_uses_ant_design_token_default_colors():
     setup(loader="wave")
     result = _inject_overlay("<html><body></body></html>")
-    assert "--dash-loading-loader-color:#1677ff" in result
-    assert "--dash-loading-loader-dark-color:#1668dc" in result
+    assert "--dash-loading-loader-color:currentColor" in result
+    assert "--dash-loading-loader-dark-color:currentColor" in result
 
 
 def test_loader_color_is_reused_in_dark_mode_when_not_explicitly_set():
-    setup(loader_color="#e91e63")
+    setup(color="#e91e63")
 
     result = _inject_overlay("<html><body></body></html>")
 
@@ -222,17 +221,17 @@ def test_loader_color_is_reused_in_dark_mode_when_not_explicitly_set():
 
 def test_text_loader_colors_use_plugin_defaults_and_allow_overrides():
     result = _inject_overlay("<html><body></body></html>")
-    assert "--dash-loading-loader-text-color:rgba(0,0,0,0.88)" in result
-    assert "--dash-loading-loader-dark-text-color:rgba(255,255,255,0.85)" in result
+    assert "--dash-loading-loader-text-color:currentColor" in result
+    assert "--dash-loading-loader-dark-text-color:currentColor" in result
 
-    setup(loader_text_color="#333333")
+    setup(text_color="#333333")
     result = _inject_overlay("<html><body></body></html>")
     assert "--dash-loading-loader-text-color:#333333" in result
     assert "--dash-loading-loader-dark-text-color:#333333" in result
 
 
 def test_text_loader_supports_custom_text_and_escapes_the_attribute():
-    setup(loader="text-shimmer", loader_text='正在加载 "报表"')
+    setup(loader="text-shimmer", text='正在加载 "报表"')
 
     result = _inject_overlay("<html><body></body></html>")
     renderer = loading_ui_runtime("text-shimmer")
@@ -251,8 +250,8 @@ def test_dash_antd_bundle_uses_the_plugin_default_loader_without_setup():
 
     assert '<span class="dash-loading__antd-dot">' in result
     assert 'data-dash-loading-resource="startup"' in result
-    assert "--dash-loading-loader-color:#1677ff" in result
-    assert "--dash-loading-loader-dark-color:#1668dc" in result
+    assert "--dash-loading-loader-color:currentColor" in result
+    assert "--dash-loading-loader-dark-color:currentColor" in result
     assert "--dash-loading-antd-scale:" not in result
 
 
@@ -265,8 +264,8 @@ def test_dash_antd_bundle_does_not_read_config_provider_tokens():
     result = _inject_overlay(index)
 
     assert "--dash-loading-background:#f5f5f5" in result
-    assert "--dash-loading-loader-color:#1677ff" in result
-    assert "--dash-loading-loader-text-color:rgba(0,0,0,0.88)" in result
+    assert "--dash-loading-loader-color:currentColor" in result
+    assert "--dash-loading-loader-text-color:currentColor" in result
 
 
 def test_dash_antd_dark_algorithm_does_not_change_plugin_defaults():
@@ -278,8 +277,8 @@ def test_dash_antd_dark_algorithm_does_not_change_plugin_defaults():
     result = _inject_overlay(index)
 
     assert "--dash-loading-background:#f5f5f5" in result
-    assert "--dash-loading-loader-color:#1677ff" in result
-    assert "--dash-loading-loader-text-color:rgba(0,0,0,0.88)" in result
+    assert "--dash-loading-loader-color:currentColor" in result
+    assert "--dash-loading-loader-text-color:currentColor" in result
 
 
 def test_explicit_loader_applies_with_a_dash_antd_bundle():
@@ -293,8 +292,8 @@ def test_explicit_loader_applies_with_a_dash_antd_bundle():
 
     assert 'data-dash-loading-ui="wave"' in result
     assert 'data-dash-loading-resource="startup"' in result
-    assert "--dash-loading-loader-color:#1677ff" in result
-    assert "--dash-loading-loader-dark-color:#1668dc" in result
+    assert "--dash-loading-loader-color:currentColor" in result
+    assert "--dash-loading-loader-dark-color:currentColor" in result
 
 
 def test_explicit_default_loader_uses_ant_design_spinner_with_dash_antd_bundle():
@@ -311,7 +310,7 @@ def test_explicit_default_loader_uses_ant_design_spinner_with_dash_antd_bundle()
 
 
 def test_explicit_colors_apply_with_the_default_loader_and_dash_antd_bundle():
-    setup(loader_color="#e91e63", loader_dark_color="#ff80ab")
+    setup(color="#e91e63", dark_color="#ff80ab")
     index = (
         '<html><head><script src="/_dash-component-suites/'
         'dash_antd_components/bundle.js"></script></head><body></body></html>'
@@ -333,20 +332,20 @@ def test_loading_ui_ring_uses_responsive_region_and_accepts_fixed_size():
         in result
     )
     assert "--dash-loading-size:32px" in result
-    assert "--dash-loading-loader-color:#1677ff" in result
+    assert "--dash-loading-loader-color:currentColor" in result
 
-    setup(loader_size=36)
+    setup(size=36)
     result = _inject_overlay("<html><body></body></html>")
     assert "--dash-loading-size:36px" in result
 
-    setup(loader_size=None)
+    setup(size=None)
     result = _inject_overlay("<html><body></body></html>")
     assert "--dash-loading-size:32px" in result
     assert "--dash-loading-scale:1" in result
 
 
 def test_explicit_colors_override_loader_defaults():
-    setup(loader_color="#222222", loader_dark_color="#eeeeee")
+    setup(color="#222222", dark_color="#eeeeee")
     result = _inject_overlay("<html><body></body></html>")
     assert "--dash-loading-loader-color:#222222" in result
     assert "--dash-loading-loader-dark-color:#eeeeee" in result
@@ -370,8 +369,6 @@ def test_custom_html_skips_loading_ui_runtime():
         "minimum_display_ms",
         "spinner_size_px",
         "spinner_stroke_px",
-        "color",
-        "dark_color",
         "hide_default_loading",
         "dash_theme_component_id",
         "theme_storage_key",
@@ -398,16 +395,16 @@ def test_configuration_validation():
                 setup(**{name: invalid_value})
     with pytest.raises(TypeError, match="theme_mode"):
         setup(theme_mode="sepia")
-    with pytest.raises(ValueError, match="loader_text"):
-        setup(loader_text=" ")
-    with pytest.raises(ValueError, match="loader_size"):
-        setup(loader_size=-1)
-    with pytest.raises(TypeError, match="loader_size"):
-        setup(loader_size=True)
-    with pytest.raises(ValueError, match="loader_stroke_width"):
-        setup(loader_stroke_width=-1)
-    with pytest.raises(TypeError, match="loader_stroke_width"):
-        setup(loader_stroke_width=True)
+    with pytest.raises(ValueError, match="text"):
+        setup(text=" ")
+    with pytest.raises(ValueError, match="size"):
+        setup(size=-1)
+    with pytest.raises(TypeError, match="size"):
+        setup(size=True)
+    with pytest.raises(ValueError, match="stroke"):
+        setup(stroke=-1)
+    with pytest.raises(TypeError, match="stroke"):
+        setup(stroke=True)
     with pytest.raises(TypeError, match="theme_store"):
         setup(theme_store=" ")
     with pytest.raises(TypeError, match="theme_store"):
@@ -420,6 +417,61 @@ def test_configuration_validation():
         setup(timeout=0)
     with pytest.raises(TypeError, match="Unknown"):
         setup(unknown=True)
+
+
+@pytest.mark.parametrize("old,new,value", [
+    ("loader_color", "color", "red"), ("loader_dark_color", "dark_color", "white"),
+    ("loader_text_color", "text_color", "black"), ("loader_dark_text_color", "dark_text_color", "white"),
+    ("loader_size", "size", 40), ("loader_stroke_width", "stroke", 1), ("loader_text", "text", "等待"),
+])
+def test_deprecated_aliases_warn_and_conflicts_do_not_change_configuration(old, new, value):
+    with pytest.warns(DeprecationWarning, match=new):
+        config = setup(**{old: value})
+    assert getattr(config, new) == value
+    with pytest.raises(TypeError, match="both"):
+        setup(**{old: value, new: value})
+    assert get_config() is config
+
+
+def test_native_defaults_and_font_size():
+    config = get_config()
+    assert config.size == 32
+    assert config.color == "currentColor"
+    assert config.rate == 1.0 and config.playing is True
+    assert config.stroke is config.font_size is None
+    setup(loader="text-shimmer", color="red", dark_color="white", font_size=24)
+    result = _inject_overlay("<html><body></body></html>")
+    assert "--dash-loading-font-size:24px" in result
+    assert "--dash-loading-loader-text-color:red" in result
+    assert "--dash-loading-loader-dark-text-color:white" in result
+    setup(stroke=0)
+    assert "--dash-loading-stroke:0" in _inject_overlay("<body></body>")
+
+
+def test_dlc_motion_contract_and_stroke_aliases():
+    setup(rate=2, playing=False, stroke=3)
+    result = _inject_overlay("<body></body>")
+    assert "--dash-loading-rate:2" in result
+    assert "--dash-loading-play-state:paused" in result
+    assert "--dash-loading-thickness:3" in result
+    assert "--dash-loading-stroke:3px" in result
+    with pytest.warns(DeprecationWarning, match="stroke"):
+        assert setup(thickness=4).stroke == 4
+    with pytest.raises(TypeError, match="both"):
+        setup(thickness=2, loader_stroke_width=3)
+    for rate in [0, -1, float("nan"), float("inf")]:
+        with pytest.raises(ValueError, match="rate"):
+            setup(rate=rate)
+    for name, value in [("rate", True), ("playing", 1)]:
+        with pytest.raises(TypeError, match=name):
+            setup(**{name: value})
+
+
+@pytest.mark.parametrize("name", ["size", "stroke", "font_size"])
+@pytest.mark.parametrize("value", [float("inf"), float("nan"), -1])
+def test_visual_lengths_must_be_finite_and_nonnegative(name, value):
+    with pytest.raises(ValueError, match=name):
+        setup(**{name: value})
 
 
 def test_setup_rejects_removed_theme_and_wait_options():

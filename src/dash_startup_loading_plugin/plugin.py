@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import re
+import math
+import warnings
 from dataclasses import dataclass, fields, replace
 from functools import cache
 from html import escape
@@ -33,11 +35,6 @@ _CONFIG_LOCK = RLock()
 _dash_server: WeakKeyDictionary[Any, list[Any]] = WeakKeyDictionary()
 
 _LOADING_UI_DEFAULT_SIZE = 32
-_LOADING_UI_DEFAULT_STROKE_WIDTH = 2
-_LIGHT_LOADER_COLOR = "#1677ff"
-_DARK_LOADER_COLOR = "#1668dc"
-_LIGHT_TEXT_COLOR = "rgba(0,0,0,0.88)"
-_DARK_TEXT_COLOR = "rgba(255,255,255,0.85)"
 LoaderName = Literal[
     "default",
     "accordion-loader",
@@ -91,12 +88,18 @@ LoaderName = Literal[
 _LOADER_NAMES = frozenset(get_args(LoaderName))
 _LOADING_UI_LOADERS = _LOADER_NAMES - {"default"}
 _COLOR_OPTIONS = (
-    "loader_color",
-    "loader_dark_color",
-    "loader_text_color",
-    "loader_dark_text_color",
+    "color",
+    "dark_color",
+    "text_color",
+    "dark_text_color",
 )
 _LOADER_ROUTE = "_dash-startup-loading"
+_DEPRECATED_OPTIONS = {
+    "loader_color": "color", "loader_dark_color": "dark_color",
+    "loader_text_color": "text_color", "loader_dark_text_color": "dark_text_color",
+    "loader_size": "size", "loader_stroke_width": "stroke", "loader_text": "text",
+    "thickness": "stroke",
+}
 
 
 @hooks.setup(priority=100)
@@ -129,19 +132,31 @@ def _requests_pathname_prefix() -> str:
 
 
 class SetupOptions(TypedDict, total=False):
+    thickness: int | float | None
+    # Deprecated aliases accepted by setup for one compatibility release.
+    loader_color: str | None
+    loader_dark_color: str | None
+    loader_text_color: str | None
+    loader_dark_text_color: str | None
+    loader_size: int | float | None
+    loader_stroke_width: int | float | None
+    loader_text: str
     enabled: bool
     aria_label: str
     z_index: int
     background: str
     dark_background: str
-    loader_color: str | None
-    loader_dark_color: str | None
-    loader_text_color: str | None
-    loader_dark_text_color: str | None
+    color: str | None
+    dark_color: str | None
+    text_color: str | None
+    dark_text_color: str | None
     loader: LoaderName
-    loader_text: str
-    loader_size: int | float | None
-    loader_stroke_width: int | float
+    text: str
+    size: int | float | None
+    stroke: int | float | None
+    rate: int | float
+    playing: bool
+    font_size: int | float | None
     custom_loader_html: str | None
 
 
@@ -158,14 +173,17 @@ class StartupLoadingConfig:
     z_index: int = 9999
     background: str = "#f5f5f5"
     dark_background: str = "#000"
-    loader_color: str | None = None
-    loader_dark_color: str | None = None
-    loader_text_color: str | None = None
-    loader_dark_text_color: str | None = None
+    color: str | None = "currentColor"
+    dark_color: str | None = None
+    text_color: str | None = None
+    dark_text_color: str | None = None
     loader: LoaderName = "default"
-    loader_text: str = "Loading"
-    loader_size: int | float | None = _LOADING_UI_DEFAULT_SIZE
-    loader_stroke_width: int | float = _LOADING_UI_DEFAULT_STROKE_WIDTH
+    text: str = "Loading"
+    size: int | float | None = _LOADING_UI_DEFAULT_SIZE
+    stroke: int | float | None = None
+    rate: int | float = 1.0
+    playing: bool = True
+    font_size: int | float | None = None
     custom_loader_html: str | None = None
 
 
@@ -181,26 +199,32 @@ def _validate_color(name: str, value: str | None) -> None:
 def _validate_length(name: str, value: float) -> None:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise TypeError(f"{name} must be an int or float")
-    if value < 0:
-        raise ValueError(f"{name} must be greater than or equal to zero")
+    if not math.isfinite(value) or value < 0:
+        raise ValueError(f"{name} must be finite and greater than or equal to zero")
 
 
 def _validate(config: StartupLoadingConfig) -> StartupLoadingConfig:
     if not isinstance(config.enabled, bool):
         raise TypeError("enabled must be a boolean")
+    if not isinstance(config.playing, bool):
+        raise TypeError("playing must be a boolean")
+    _validate_length("rate", config.rate)
+    if config.rate == 0:
+        raise ValueError("rate must be greater than zero; use playing=False to pause")
     if config.loader not in _LOADER_NAMES:
         raise ValueError("loader must be a Loading UI loader name or 'default'")
-    if not isinstance(config.loader_text, str) or not config.loader_text.strip():
-        raise ValueError("loader_text must be a non-empty string")
+    if not isinstance(config.text, str) or not config.text.strip():
+        raise ValueError("text must be a non-empty string")
     for name in ("background", "dark_background"):
         value = getattr(config, name)
         if not isinstance(value, str) or not value.strip():
             raise ValueError(f"{name} must be a non-empty CSS color")
     for name in _COLOR_OPTIONS:
         _validate_color(name, getattr(config, name))
-    if config.loader_size is not None:
-        _validate_length("loader_size", config.loader_size)
-    _validate_length("loader_stroke_width", config.loader_stroke_width)
+    for name in ("size", "stroke", "font_size"):
+        value = getattr(config, name)
+        if value is not None:
+            _validate_length(name, value)
     return config
 
 
@@ -211,6 +235,17 @@ def setup(**changes: Unpack[SetupOptions]) -> StartupLoadingConfig:
     process-wide, so one configuration is shared by all apps in the process.
     """
 
+    supplied = {}
+    for name in changes:
+        canonical = _DEPRECATED_OPTIONS.get(name, name)
+        if canonical in supplied:
+            raise TypeError(f"Cannot specify both {supplied[canonical]!r} and {name!r}")
+        supplied[canonical] = name
+    changes = dict(changes)
+    for old, new in _DEPRECATED_OPTIONS.items():
+        if old in changes:
+            warnings.warn(f"{old} is deprecated; use {new} instead", DeprecationWarning, stacklevel=2)
+            changes[new] = changes.pop(old)
     valid_names = {field.name for field in fields(StartupLoadingConfig)}
     unknown = set(changes).difference(valid_names)
     if unknown:
@@ -239,43 +274,46 @@ def reset_config() -> StartupLoadingConfig:
 
 
 class _Visuals(NamedTuple):
-    loader_color: str
-    loader_dark_color: str
+    color: str
+    dark_color: str
     text_color: str
     dark_text_color: str
 
 
 def _resolved_visuals(config: StartupLoadingConfig) -> _Visuals:
     return _Visuals(
-        loader_color=config.loader_color or _LIGHT_LOADER_COLOR,
-        loader_dark_color=config.loader_dark_color or config.loader_color or _DARK_LOADER_COLOR,
-        text_color=config.loader_text_color or _LIGHT_TEXT_COLOR,
-        dark_text_color=config.loader_dark_text_color or config.loader_text_color or _DARK_TEXT_COLOR,
+        color=config.color or "inherit",
+        dark_color=config.dark_color or config.color or "inherit",
+        text_color=config.text_color or config.color or "inherit",
+        dark_text_color=config.dark_text_color or config.text_color or config.dark_color or config.color or "inherit",
     )
 
 
 def _overlay_styles(config: StartupLoadingConfig, loader: str) -> dict[str, str]:
     visuals = _resolved_visuals(config)
-    size = _LOADING_UI_DEFAULT_SIZE if config.loader_size is None else config.loader_size
-    scale = size / _LOADING_UI_DEFAULT_SIZE
-    rendered_size = size * 20 / _LOADING_UI_DEFAULT_SIZE if loader == "default" else size
-    # Loading UI draws at its own baseline, so the stroke is pre-divided by the scale.
-    loading_ui_stroke = config.loader_stroke_width / scale if scale > 0 else config.loader_stroke_width
+    size = (20 if loader == "default" else _LOADING_UI_DEFAULT_SIZE) if config.size is None else config.size
     styles = {
         "--dash-loading-background": config.background,
         "--dash-loading-dark-background": config.dark_background,
-        "--dash-loading-loader-color": visuals.loader_color,
-        "--dash-loading-loader-dark-color": visuals.loader_dark_color,
+        "--dash-loading-loader-color": visuals.color,
+        "--dash-loading-loader-dark-color": visuals.dark_color,
         "--dash-loading-loader-text-color": visuals.text_color,
         "--dash-loading-loader-dark-text-color": visuals.dark_text_color,
-        "--dash-loading-size": f"{rendered_size:g}px",
-        "--dash-loading-scale": f"{scale:g}",
-        "--dash-loading-ui-display": "none" if scale == 0 else "inline-flex",
-        "--dash-loading-stroke": f"{config.loader_stroke_width}px",
-        "--dash-loading-ui-stroke": f"{loading_ui_stroke:g}px",
+        "--dash-loading-size": f"{size:g}px",
+        "--dash-loading-scale": "1",
+        "--dash-loading-ui-display": "none" if size == 0 else "inline-flex",
         "--dash-loading-z-index": str(config.z_index),
         "--dash-loading-fade-duration": "0ms",
+        "--dash-loading-rate": f"{config.rate:g}",
+        "--dash-loading-play-state": "running" if config.playing else "paused",
     }
+    if config.size is not None:
+        styles["--dash-loading-target-size"] = f"{config.size:g}"
+    if config.stroke is not None:
+        styles["--dash-loading-stroke"] = f"{config.stroke:g}px"
+        styles["--dash-loading-thickness"] = f"{config.stroke:g}"
+    if config.font_size is not None:
+        styles["--dash-loading-font-size"] = f"{config.font_size:g}px"
     return styles
 
 
@@ -289,7 +327,7 @@ def _loader_markup(config: StartupLoadingConfig, loader: str) -> str:
         )
     return (
         f'<span class="dash-loading__loading-ui" data-dash-loading-ui="{escape(loader, quote=True)}" '
-        f'data-dash-loading-text="{escape(config.loader_text, quote=True)}" '
+        f'data-dash-loading-text="{escape(config.text, quote=True)}" '
         'aria-hidden="true"></span>'
     )
 

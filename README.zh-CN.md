@@ -94,7 +94,7 @@ uv add dash-ant-design
 ```python
 from dash_startup_loading_plugin import setup
 
-setup(loader="default", loader_color="#1677ff")
+setup(loader="default", color="#1677ff")
 ```
 
 也可以仅显式选择 Ant Design loader：
@@ -112,23 +112,59 @@ setup(loader="default")
 | `z_index` | `9999` | 遮罩层级。 |
 | `background` | `#f5f5f5` | 亮色模式下的遮罩背景。 |
 | `dark_background` | `#000` | `html.dark` 下的遮罩背景。 |
-| `loader_color` | `#1677ff` | loader 亮色颜色。 |
-| `loader_dark_color` | `#1668dc` | loader 暗色颜色。 |
-| `loader_text_color` | `rgba(0,0,0,0.88)` | `text-*` loader 亮色文字颜色。 |
-| `loader_dark_text_color` | `rgba(255,255,255,0.85)` | `text-*` loader 暗色文字颜色。 |
+| `color` | `"currentColor"` | 继承遮罩前景色；显式 CSS 颜色覆盖默认值。 |
+| `dark_color` | `None` | 暗色覆盖，依次回退至 `color`、继承颜色。 |
+| `text_color` | `None` | 可选文字颜色，依次回退至 `color`、继承颜色。 |
+| `dark_text_color` | `None` | 依次回退至 `text_color`、`dark_color`、`color`、继承颜色。 |
 | `loader` | `"default"` | Ant Design 四圆点 spinner；可选 `"ring"` 使用 Loading UI ring。 |
-| `loader_text` | `"Loading"` | `text-*` loader 的文字。 |
-| `loader_size` | `32` | loader 的尺寸基准。默认 Ant Design spinner 使用与 Spin middle 一致的 20px 尺寸；其他常规 loader 使用 2rem（32px）基准。下列八个例外按其原有几何比例缩放。 |
-| `loader_stroke_width` | `2` | Loading UI 边框和 SVG 描边宽度。 |
+| `text` | `"Loading"` | `text-*` loader 的文字。 |
+| `size` | `32` | 图形 loader 容器最长边的 CSS 像素值，保持比例；文字 loader 使用 `font_size`。`None` 保留原始几何，`0` 隐藏。可见图形不保证填满容器。 |
+| `stroke` | `None` | 保留原始边框和 SVG 描边。数字覆盖支持的描边宽度（CSS 像素）；圆点、文字和实心图形可能没有可调整描边。 |
+| `rate` | `1.0` | 正数，相对动画速度；`2.0` 为两倍速度，`0.5` 为半速。 |
+| `playing` | `True` | `False` 暂停 CSS 和 SVG 动画，仍显示 loader。 |
+| `font_size` | `None` | `text-*` loader 字号（CSS 像素），独立于容器尺寸。 |
 | `custom_loader_html` | `None` | 替换 loader 的可信 HTML。 |
 
 `custom_loader_html` 会原样插入页面，禁止传入不可信用户输入。
+
+Loading UI 保留 `currentColor` 默认机制。遮罩提供亮色 `rgba(0,0,0,.88)`、
+暗色 `rgba(255,255,255,.85)` 的前景色兜底。未指定文字颜色时，文字也使用
+`color`。遮罩显示期间切换 `html.dark`，shimmer-wave 动画颜色会同步更新。
+`text-*` loader 保留原始 1.25rem 字号，宽度随内容变化。使用 `font_size` 调整字号；
+`size` 不缩放文字 loader（`size=0` 仍会隐藏 loader）。
+
+`setup()` 保留一个版本的弃用别名：`loader_color` → `color`、
+`loader_dark_color` → `dark_color`、`loader_text_color` → `text_color`、
+`loader_dark_text_color` → `dark_text_color`、`loader_size` → `size`、
+`loader_stroke_width` → `stroke`、`loader_text` → `text`、`thickness` → `stroke`。
+旧名称触发 `DeprecationWarning`，同时传入新旧名称触发 `TypeError`。
+配置对象使用新字段名。显式 `size` 表示实际容器尺寸，不再表示相对 32px 的缩放基准。
+
+```python
+setup(loader="ring", color="#1677ff", size=32, stroke=2)
+setup(loader="text-shimmer", text="正在加载", font_size=20)
+```
+
+公共参数 `size/color/rate/playing` 与 dash-loading-components（DLC）对齐。
+32px 是插件统一采用的默认值，并非 DLC 所有组件的上游默认值；两阶段应显式
+共用配置以避免默认值差异。`stroke` 对应 DLC 的 `ldrs.Ring` 描边参数，但并非
+所有 DLC 组件都支持。此阶段仍使用现有 Loading UI 动画和最长边尺寸语义，
+参数一致不代表动画完全相同；插件不强制依赖 DLC。
+
+```python
+SPINNER = dict(size=32, color="#1677ff", rate=1.0, playing=True)
+setup(loader="ring", stroke=3, **SPINNER)
+
+# 安装 DLC 后，可在应用中使用：
+# dcc.Loading(children=content,
+#     custom_spinner=dlc.ldrs.Ring(stroke=3, **SPINNER))
+```
 
 遮罩背景根据应用的 `html.dark` class 选择 `background` 或 `dark_background`，默认值分别为 `#f5f5f5` 和 `#000`。插件不会读取 `--layout-bg` 或 ConfigProvider token。
 
 ## Loading UI
 
-默认的 `default` loader 使用内联 HTML 和 CSS。Loading UI loader 会按需加载隔离 renderer。每个 loader 单独打包，页面只引用当前选中的那个（`<requests_pathname_prefix>_dash-startup-loading/<loader>.js`），因此 HTML 体积不受 loader 选择影响，且 renderer 可被浏览器长期缓存，不拖慢首屏。可用 `loader_text`、颜色参数和尺寸参数自定义 loader：
+默认的 `default` loader 使用内联 HTML 和 CSS。Loading UI loader 会按需加载隔离 renderer。每个 loader 单独打包，页面只引用当前选中的那个（`<requests_pathname_prefix>_dash-startup-loading/<loader>.js`），因此 HTML 体积不受 loader 选择影响，且 renderer 可被浏览器长期缓存，不拖慢首屏。可用 `text`、颜色参数和尺寸参数自定义 loader：
 
 资源基于固定版本的 Loading UI 源码生成，使用轻量 DOM 渲染器一次性挂载。
 每个包只包含自身所需的样式与动画，不再携带 React、React DOM、Motion 或完整
@@ -137,19 +173,20 @@ Tailwind 样式表；Motion 循环动画转换为原生 CSS 关键帧或 SVG 路
 此渲染器专用于固定版本的 loader 集合，不用于渲染任意 React 组件。
 
 ```python
-setup(loader="text-shimmer", loader_text="正在准备仪表盘", loader_color="#1677ff")
+setup(loader="text-shimmer", text="正在准备仪表盘", color="#1677ff")
 ```
 
 ## Loader 预览
 
-除特殊项外，loader 的尺寸均为 2rem × 2rem；默认 Ant Design spinner 与 AntD Spin middle 一致，为 20px × 20px；
+以下原始几何适用于 `size=None`：除特殊项外，loader 为 2rem × 2rem；默认 Ant Design spinner 与 AntD Spin middle 一致，为 20px × 20px；
 `infinity` 和 `morphing-infinity` 为 3rem × 3rem。
 四种 `text-*` loader 保留原字号；`wave` 为宽 3rem、高 2rem；
-`triple-dot-spinner` 和 `twin-orbit` 为 0.6rem × 0.6rem；`swirling` 等比例缩小至
-原始 6rem × 6rem 尺寸。`accordion-loader`、`conveyor-loop`、`infinity-square-snake`、
+`triple-dot-spinner` 和 `twin-orbit` 的圆点为 0.6rem，动画容器预留 4.25 倍圆点尺寸；
+显式 `size` 缩放整组动画（包括轨道圆点），而不是放大单个圆点。`swirling` 默认 SVG 视口为
+48px × 48px。`accordion-loader`、`conveyor-loop`、`infinity-square-snake`、
 `infinity-track`、`square-accordion`、`square-grid`、`symmetric-wave`、
 `square-snake` 保留原有几何设置。
-`loader_size` 会在默认几何基础上按比例缩放。
+显式 `size` 将容器最长边等比例缩放到指定 CSS 像素值。
 
 所有组件库使用相同的默认 loader：
 
@@ -161,8 +198,8 @@ setup(loader="text-shimmer", loader_text="正在准备仪表盘", loader_color="
 
 所有 Loading UI loader 都单独打包，只在被选中时加载。下面的预览图链接到官方
 交互式演示页面，点击图片即可查看动态效果和源码。`text-*` loader 支持通过
-`loader_text` 自定义文字；`loader_color`、`loader_dark_color`、`loader_size` 和
-`loader_stroke_width` 会在对应 loader 支持时生效。
+`text` 自定义文字；`color`、`dark_color`、`size` 和
+`stroke` 会在对应 loader 支持时生效。
 
 | 预览 | 预览 | 预览 |
 | --- | --- | --- |

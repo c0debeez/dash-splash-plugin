@@ -131,18 +131,60 @@ and callbacks.
 | `z_index` | `9999` | Overlay stacking order. |
 | `background` | `#f5f5f5` | Overlay background in light mode. |
 | `dark_background` | `#000` | Overlay background when `html.dark` is set. |
-| `loader_color` | `#1677ff` | Loader color in light mode. |
-| `loader_dark_color` | `#1668dc` | Loader color in dark mode. |
-| `loader_text_color` | `rgba(0,0,0,0.88)` | Text color for `text-*` Loading UI loaders in light mode. |
-| `loader_dark_text_color` | `rgba(255,255,255,0.85)` | Text color for `text-*` Loading UI loaders in dark mode. |
+| `color` | `"currentColor"` | Inherit the overlay foreground; an explicit CSS color overrides it. |
+| `dark_color` | `None` | Dark-mode override; falls back to `color`, then inherited foreground. |
+| `text_color` | `None` | Optional text color; falls back to `color`, then inherited foreground. |
+| `dark_text_color` | `None` | Falls back to `text_color`, `dark_color`, `color`, then inherited foreground. |
 | `loader` | `"default"` | Ant Design's four-dot spinner. Use `"ring"` for the Loading UI ring. |
-| `loader_text` | `"Loading"` | Text rendered by `text-*` Loading UI loaders. |
-| `loader_size` | `32` | Target size baseline. The default Ant Design spinner uses a 20px middle-size baseline; other standard loaders use 2rem (32px). The eight listed exceptions scale proportionally from their bundled geometry. `None` uses these defaults. |
-| `loader_stroke_width` | `2` | Loading UI border and SVG stroke width, generated from its 2px default at the 32px ring baseline. |
+| `text` | `"Loading"` | Text rendered by `text-*` Loading UI loaders. |
+| `size` | `32` | Graphical loader container's longest side in CSS pixels, keeping the aspect ratio. Text loaders use `font_size`. `None` preserves original geometry; `0` hides the loader. The visible artwork may not fill its container. |
+| `stroke` | `None` | Preserve original borders and SVG strokes. A number overrides supported borders and strokes in CSS pixels; dot, text and filled-shape loaders may have no adjustable stroke. |
+| `rate` | `1.0` | Positive relative animation tempo. `2.0` is twice as fast; `0.5` is half speed. |
+| `playing` | `True` | `False` pauses CSS and SVG animations without hiding the loader. |
+| `font_size` | `None` | Font size in CSS pixels for `text-*` loaders; independent of container sizing. |
 | `custom_loader_html` | `None` | Trusted HTML replacing the default spinner. |
 
 `custom_loader_html` is inserted verbatim and must never contain untrusted
 user input.
+
+Loading UI retains its `currentColor` defaults. The overlay supplies a readable
+foreground: `rgba(0,0,0,.88)` in light mode and `rgba(255,255,255,.85)` in dark
+mode. Color overrides apply to text loaders too unless a text color is supplied.
+Shimmer-wave colors follow changes to `html.dark` while the overlay is visible.
+`text-*` loaders retain their original 1.25rem font size and fit their content.
+Use `font_size` to change their font size; `size` does not scale text loaders
+(except `size=0`, which still hides the loader).
+
+For one compatibility release, `setup()` accepts deprecated aliases:
+`loader_color` → `color`, `loader_dark_color` → `dark_color`,
+`loader_text_color` → `text_color`, `loader_dark_text_color` → `dark_text_color`,
+`loader_size` → `size`, `loader_stroke_width` → `stroke`, and
+`loader_text` → `text`, and `thickness` → `stroke`. They emit `DeprecationWarning`; supplying an alias and
+its replacement together raises `TypeError`. Configuration objects use the new
+field names. Explicit `size` now means actual container size, not the previous
+32px scaling baseline.
+
+```python
+setup(loader="ring", color="#1677ff", size=32, stroke=2)
+setup(loader="text-shimmer", text="Loading", font_size=20)
+```
+
+The common `size`, `color`, `rate`, and `playing` names match
+`dash-loading-components` (DLC). A shared 32px preset avoids the libraries'
+different per-spinner defaults; 32px is this plugin's chosen default, not a
+universal DLC upstream default. `stroke` matches DLC's `ldrs.Ring` prop but is
+not supported by every DLC component. The existing Loading UI animations and
+longest-side sizing remain unchanged; matching parameters does not make them
+visually identical to DLC animations. DLC is not a required dependency.
+
+```python
+SPINNER = dict(size=32, color="#1677ff", rate=1.0, playing=True)
+setup(loader="ring", stroke=3, **SPINNER)
+
+# In an app with dash-loading-components installed:
+# dcc.Loading(children=content,
+#     custom_spinner=dlc.ldrs.Ring(stroke=3, **SPINNER))
+```
 
 The default loader uses Ant Design's four-dot animation:
 
@@ -150,10 +192,10 @@ The default loader uses Ant Design's four-dot animation:
 setup(loader="default")
 ```
 
-The overlay selects `background` or `dark_background` according to the application's `html.dark` class. It does not read `--layout-bg` or ConfigProvider tokens. Use `loader_size`, `loader_color`, `loader_dark_color`, `loader_text_color`, and `loader_dark_text_color` to match a customized theme. Use `loader_text` to replace the default text in `text-*` loaders:
+The overlay selects `background` or `dark_background` according to the application's `html.dark` class. It does not read `--layout-bg` or ConfigProvider tokens. Use `size`, `color`, `dark_color`, `text_color`, and `dark_text_color` to match a customized theme. Use `text` to replace the default text in `text-*` loaders:
 
 ```python
-setup(loader="text-shimmer", loader_text="Preparing dashboard")
+setup(loader="text-shimmer", text="Preparing dashboard")
 ```
 
 ## Loader gallery
@@ -169,8 +211,8 @@ The default is the same for every component library:
 All Loading UI loaders are bundled separately and loaded only when selected.
 The preview images below link to the official interactive demos. Open a preview
 to see its live animation and source details. The `text-*` loaders accept
-custom text through `loader_text`; `loader_color`, `loader_dark_color`,
-`loader_size`, and `loader_stroke_width` apply where supported.
+custom text through `text`; `color`, `dark_color`,
+`size`, and `stroke` apply where supported.
 
 | Preview | Preview | Preview |
 | --- | --- | --- |
@@ -200,7 +242,7 @@ accordion-loader, analyzing-image, arc, bars, bobbing-dots, bouncing-dots, class
 For example:
 
 ```python
-setup(loader="spiral", loader_color="#e91e63", loader_dark_color="#ff80ab")
+setup(loader="spiral", color="#e91e63", dark_color="#ff80ab")
 ```
 
 The default Ant Design spinner uses inline markup and CSS. The `ring` and other Loading UI loaders use a bundled, isolated renderer loaded before Dash starts. Each loader ships as its own bundle, and the index only references the selected one at `<requests_pathname_prefix>_dash-startup-loading/<loader>.js`. That keeps the HTML document small and lets the browser cache the renderer, so the choice of loader does not grow the first-screen payload. No other indicator is shown while that renderer starts. Loading UI loaders sit in a centered 4:3 region that uses full width below 640px, half width from 640px, one-third from 768px, and one-quarter from 1024px.
@@ -212,14 +254,16 @@ Motion-based loops are converted to native CSS keyframes or SVG path animations.
 Rebuild the resources with `python scripts/build_loading_ui.py` (requires Node.js
 and npm). The renderer targets this pinned catalog, not arbitrary React components.
 
-Most loaders use a 2rem × 2rem baseline. The default Ant Design spinner uses
+With `size=None`, most loaders use a 2rem × 2rem baseline. The default Ant Design spinner uses
 the 20px AntD Spin middle size. `infinity` and `morphing-infinity` use 3rem × 3rem. The four `text-*` loaders keep their original font sizes; `wave` uses
-3rem × 2rem; `triple-dot-spinner` and `twin-orbit` use 0.6rem × 0.6rem. The
-`swirling` retains its original 6rem × 6rem size. `accordion-loader`,
+3rem × 2rem; `triple-dot-spinner` and `twin-orbit` use 0.6rem dots with a
+4.25-dot-wide animation envelope. Their explicit `size` fits the whole animation,
+including orbiting dots, rather than enlarging each dot to that size. The
+`swirling` uses a default 48px × 48px SVG viewport. `accordion-loader`,
 `conveyor-loop`, `infinity-square-snake`, `infinity-track`, `square-accordion`,
 `square-grid`, `symmetric-wave`, and `square-snake` retain their original
 geometry.
-`loader_size` scales each loader relative to this baseline.
+An explicit `size` scales the longest container side to that many CSS pixels.
 
 ## Python API
 

@@ -21,13 +21,19 @@ class Element {
     this.children = []; this.style = {setProperty(name, value) {this[name] = value;}};
   }
   setAttribute(name, value) {this.attributes[name] = value;}
+  getAttribute(name) {return this.attributes[name] || null;}
+  getAnimations() {return [];}
+  querySelectorAll(selector) {return walk(this).slice(1).filter(node => selector === '*' || selector.split(',').includes(node.tag));}
+  pauseAnimations() {this.paused = true;}
   appendChild(child) {child.parent = this; this.children.push(child); return child;}
-  attachShadow() {return this.shadow = new Element('shadow');}
+  getRootNode() {let node=this; while(node.parent) node=node.parent; return node;}
+  attachShadow() {this.shadow = new Element('shadow'); this.shadow.host = this; return this.shadow;}
 }
 function walk(node) {return [node, ...node.children.flatMap(walk)];}
 const result = {};
 for (const [name, source] of Object.entries(BUNDLES)) {
   const host = new Element('host');
+  if (name.startsWith('text-')) host.style['--dash-loading-target-size'] = '32';
   host.dataset = {dashLoadingText: '报表 <img src=x onerror=alert(1)>'};
   const document = {
     querySelector: () => host,
@@ -35,7 +41,7 @@ for (const [name, source] of Object.entries(BUNDLES)) {
     createElementNS: (namespace, tag) => new Element(tag, namespace),
     createTextNode: text => Object.assign(new Element('#text'), {text}),
   };
-  const context = {document, getComputedStyle: element => ({
+  const context = {document, MutationObserver: class {observe(){} disconnect(){}}, getComputedStyle: element => ({
     color: 'rgb(22, 119, 255)',
     getPropertyValue(name) {
       for (let node = element; node; node = node.parent) {
@@ -47,6 +53,7 @@ for (const [name, source] of Object.entries(BUNDLES)) {
   vm.runInNewContext(source, context);
   const nodes = walk(host.shadow);
   result[name] = {
+    hostZoom: host.style.zoom,
     targetStyle: host.shadow.children[1].style,
     text: nodes.filter(node => node.tag === '#text' && node.parent.tag !== 'style').map(node => node.text).join(''),
     css: nodes.filter(node => node.tag === 'style').map(node => node.textContent || node.children.map(child => child.text).join('')).join(''),
@@ -67,9 +74,9 @@ def test_all_loader_bundles_mount_and_keep_their_geometry(rendered_loaders):
     for result in rendered_loaders.values():
         assert len(result["elements"]) > 2
         assert "box-sizing:border-box" in result["css"]
-        assert "var(--dash-loading-ui-stroke,2px)" in result["css"]
+        assert "--dash-loading-ui-stroke" not in result["css"]
     for name, size in {"ring": "2rem", "infinity": "3rem", "morphing-infinity": "3rem",
-                       "triple-dot-spinner": "0.6rem", "twin-orbit": "0.6rem", "swirling": "6rem"}.items():
+                       "triple-dot-spinner": "calc(0.6rem * 4.25)", "twin-orbit": "calc(0.6rem * 4.25)", "swirling": "48px"}.items():
         assert rendered_loaders[f"{name}.js"]["targetStyle"]["width"] == size
         assert rendered_loaders[f"{name}.js"]["targetStyle"]["height"] == size
     assert rendered_loaders["wave.js"]["targetStyle"]["width"] == "3rem"
@@ -77,6 +84,13 @@ def test_all_loader_bundles_mount_and_keep_their_geometry(rendered_loaders):
     svg = next(node for node in rendered_loaders["infinity.js"]["elements"] if node["tag"] == "svg")
     assert svg["attributes"]["preserveAspectRatio"] == "xMidYMid"
     assert svg["namespace"] == "http://www.w3.org/2000/svg"
+    ring_path = next(node for node in rendered_loaders["ring.js"]["elements"] if node["tag"] == "path")
+    assert ring_path["attributes"]["stroke-width"] == "2"
+    swirl_circle = next(node for node in rendered_loaders["swirling.js"]["elements"] if node["tag"] == "circle")
+    assert swirl_circle["attributes"]["stroke-width"] == "50"
+    for name in ("triple-dot-spinner", "twin-orbit"):
+        inner = rendered_loaders[f"{name}.js"]["elements"][3]
+        assert inner["style"]["width"] == inner["style"]["height"] == "0.6rem"
 
 
 def test_custom_text_is_rendered_as_text_in_every_text_loader(rendered_loaders):
@@ -85,6 +99,7 @@ def test_custom_text_is_rendered_as_text_in_every_text_loader(rendered_loaders):
         assert "报表 <img src=x onerror=alert(1)>" in result["text"]
         assert not any(node["tag"] == "img" for node in result["elements"])
         assert result["targetStyle"]["fontSize"] == "1.25rem"
+        assert result.get("hostZoom") is None
 
 
 def test_motion_loaders_have_native_looping_animations(rendered_loaders):

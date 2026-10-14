@@ -61,7 +61,7 @@ COMPONENT_STYLES = {
     "skeleton": {"width": "2rem", "height": "2rem"},
     "spiral": {"width": "2rem", "height": "2rem"},
     "spokes": {"width": "2rem", "height": "2rem"},
-    "swirling": {"width": "6rem", "height": "6rem"},
+    "swirling": {"width": "48px", "height": "48px"},
     "terminal": {"width": "2rem", "height": "2rem", "fontSize": "1.25rem"},
     "text-blink": {"fontSize": "1.25rem"},
     "text-dots": {"fontSize": "1.25rem", "fontWeight": "500"},
@@ -76,6 +76,10 @@ COMPONENT_STYLES = {
 
 # Loaders whose root element is sized through ``style`` rather than a class.
 FORWARDS_STYLE = frozenset({"diamond", "morphing-infinity", "swirling"})
+
+# These roots describe one dot, not the complete rotating artwork. Reserve
+# its maximum envelope, including rotated element bounding boxes (~4.23 dots).
+VISUAL_SCALES = {"triple-dot-spinner": 4.25, "twin-orbit": 4.25}
 
 TAILWIND_THEME = (
     '@import "tailwindcss/utilities";\n'
@@ -111,6 +115,7 @@ def entry_source(name: str, component: Path, mount_module: Path, stylesheet: Pat
         f"  geometry: {json.dumps(COMPONENT_STYLES.get(name, {}), separators=(',', ':'))},\n"
         f"  usesText: {json.dumps(name.startswith('text-'))},\n"
         f"  forwardsStyle: {json.dumps(name in FORWARDS_STYLE)},\n"
+        f"  visualScale: {VISUAL_SCALES.get(name, 1)},\n"
         "});\n"
     )
 
