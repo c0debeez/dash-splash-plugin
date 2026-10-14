@@ -22,7 +22,7 @@ from typing_extensions import Unpack
 try:
     __version__ = version("dash-startup-loading-plugin")
 except PackageNotFoundError:  # pragma: no cover - source tree fallback
-    __version__ = "2.0.1"
+    __version__ = "3.0.0"
 
 _OVERLAY_MARKER = "data-dash-loading"
 _BODY_PATTERN = re.compile(r"<body(?:\s[^>]*)?>", flags=re.IGNORECASE)

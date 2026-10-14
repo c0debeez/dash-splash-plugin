@@ -6,7 +6,7 @@
 一个基于 [Dash Hooks](https://dash.plotly.com/dash-plugins-using-hooks) 的首屏加载插件，为 Dash 应用提供可配置的全屏加载遮罩。
 安装后自动启用默认动画，也可从 48 种 loader 中选择，并统一设置颜色、尺寸和动画播放行为。Dash 原生组件与 Dash Ant Design 使用相同的配置方式。
 
-![usage.py 中全部 48 种 loader 的动态预览](docs/assets/loader-preview.gif)
+![usage.py 中全部 48 种 loader 的动态预览](https://raw.githubusercontent.com/C0deBeez/dash-startup-loading-plugin/a2bc500ddbcb2f1c3d6d9f1132a93e115ddd4520/docs/assets/loader-preview.gif)
 
 *录制自项目的 `usage.py` 演示页面。演示中持续显示动画以便比较；实际应用的启动遮罩会自动关闭。*
 
@@ -15,7 +15,7 @@
 需要 **Python 3.9+** 和 **Dash 3.0.3+**。
 
 ```bash
-pip install "dash-startup-loading-plugin>=2.0.1"
+pip install "dash-startup-loading-plugin>=3.0.0"
 ```
 
 Dash 通过 `dash_hooks` entry point 自动发现插件，无需显式注册、复制 assets 或替换 `index_string`。

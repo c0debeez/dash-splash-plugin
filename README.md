@@ -9,7 +9,7 @@ Install it to enable the default spinner automatically, or choose from 48 loader
 styles with shared color, size and playback controls. Native Dash and Dash Ant
 Design applications use the same configuration.
 
-![Animated preview of all 48 loaders running in usage.py](docs/assets/loader-preview.gif)
+![Animated preview of all 48 loaders running in usage.py](https://raw.githubusercontent.com/C0deBeez/dash-startup-loading-plugin/a2bc500ddbcb2f1c3d6d9f1132a93e115ddd4520/docs/assets/loader-preview.gif)
 
 *Recorded from the repository's `usage.py` demo. This page keeps the loaders
 visible for comparison; an application's startup overlay closes automatically.*
@@ -19,7 +19,7 @@ visible for comparison; an application's startup overlay closes automatically.*
 Requires **Python 3.9+** and **Dash 3.0.3+**.
 
 ```bash
-pip install "dash-startup-loading-plugin>=2.0.1"
+pip install "dash-startup-loading-plugin>=3.0.0"
 ```
 
 Dash discovers the plugin through its `dash_hooks` entry point. No explicit
