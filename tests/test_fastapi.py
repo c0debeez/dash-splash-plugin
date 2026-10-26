@@ -18,11 +18,10 @@ from fastapi.testclient import TestClient
 
 
 @pytest.mark.parametrize("prefix", ["/", "/docs/"])
-@pytest.mark.parametrize("loader", ["antd:antd", "gridora:orbit"])
+@pytest.mark.parametrize("loader", ["antd:spin", "antd:loading", "antd:progress", "antd:skeleton", "gridora:orbit"])
 def test_fastapi_serves_react_assets_with_request_prefix(prefix, loader):
     reset_config()
-    library, name = loader.split(":", 1)
-    setup(library=library, loader=name)
+    setup(loader=loader)
     try:
         server = FastAPI()
         request_prefix = f"/proxy{prefix}"

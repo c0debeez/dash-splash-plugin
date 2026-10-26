@@ -66,6 +66,7 @@ function Artwork({host, Component, definition, config, ready}: {
     ...(config.stroke === undefined ? {} : {thickness: config.stroke}),
     ...config.loader_options,
   };
+  if (definition.family === 'antd') props.styleContainer = host.shadowRoot;
   // Upstream contracts use camelCase native keys while Dash wrappers expose
   // snake_case. Supply both so explicit native tempo/play options really win.
   for (const [name, value] of Object.entries(config.loader_options)) {
@@ -122,7 +123,7 @@ function Artwork({host, Component, definition, config, ready}: {
     const update = () => {
       // Native components retain their own speed mapping. Loading UI and SMIL-only
       // families need only browser playback controls, not a Motion imitation.
-      if ((legacy && !definition.bindPlayback) || definition.family === 'loader-spinner') {
+      if ((legacy && !definition.bindPlayback) || definition.family === 'loader-spinner' || definition.family === 'antd') {
         element.getAnimations({subtree: true}).forEach(animation => {
           animation.updatePlaybackRate(config.rate);
           if (playing) animation.play(); else animation.pause();
@@ -144,7 +145,7 @@ function Artwork({host, Component, definition, config, ready}: {
     const observer = new MutationObserver(update);
     observer.observe(element, {childList: true, subtree: true});
     return () => { observer.disconnect(); stopMotion?.(); };
-  }, [config.rate, config.loader_options, definition.bindPlayback, definition.family, legacy, playing]);
+  }, [color, config.rate, config.loader_options, definition.bindPlayback, definition.family, legacy, playing]);
 
   return <div ref={viewport} className="viewport" style={{position: 'relative'}}>
     <div ref={node} className={`artwork${playing ? '' : ' dlc-paused'}`} style={{position: 'absolute', left: 0, top: 0,
@@ -169,19 +170,26 @@ export function render(host: HTMLElement, Component: React.ElementType, definiti
   let root: ReturnType<typeof createRoot> | undefined;
   const config: Config = JSON.parse(host.dataset.dashSplashConfig!);
   const shadow = host.shadowRoot ?? host.attachShadow({mode: 'open'});
+  const preview = host.dataset.dashSplashStatic && shadow.firstChild ? document.createElement('div') : undefined;
+  if (preview) preview.append(...Array.from(shadow.childNodes, node => node.cloneNode(true)));
   const slot = document.createElement('slot');
   const style = document.createElement('style');
-  // This upstream library injects its static CSS into document.head rather
-  // than exporting a stylesheet. Mirror only its own rules into the shadow.
+  // Upstream keyframes may be registered on import or during a later render.
+  // Mirror only this family's rules, including color/size-dependent updates.
   const marker = definition.family === 'indicators' ? 'rli-' : definition.family === 'spinners' ? 'react-spinners-' : null;
-  style.textContent = RESET + (marker
-    ? Array.from(document.head.querySelectorAll('style')).map(node => {
-        try { return Array.from(node.sheet?.cssRules ?? []).map(rule => rule.cssText).join('\n'); }
-        catch { return node.textContent ?? ''; }
-      }).filter(css => css.includes(marker)).join('\n') : '');
+  const mirrorStyles = () => {
+    style.textContent = RESET + (marker
+      ? Array.from(document.head.querySelectorAll('style')).map(node => {
+          try { return Array.from(node.sheet?.cssRules ?? []).map(rule => rule.cssText).join('\n'); }
+          catch { return node.textContent ?? ''; }
+        }).filter(css => css.includes(marker)).join('\n') : '');
+  };
+  mirrorStyles();
+  const styleObserver = marker ? new MutationObserver(mirrorStyles) : undefined;
+  styleObserver?.observe(document.head, {childList: true, subtree: true, characterData: true});
   const container = document.createElement('div');
   container.style.display = 'none';
-  shadow.replaceChildren(style, slot, container);
+  shadow.replaceChildren(style, slot, ...preview ? [preview] : [], container);
   const failed = () => {
     host.dataset.dashSplashError = 'render';
     container.style.display = 'none';
@@ -190,6 +198,7 @@ export function render(host: HTMLElement, Component: React.ElementType, definiti
   };
   const ready = () => {
     if (disposed) return;
+    preview?.remove();
     slot.hidden = true;
     container.style.display = 'inline-flex';
     host.dataset.dashSplashEnhanced = 'true';
@@ -220,6 +229,7 @@ export function render(host: HTMLElement, Component: React.ElementType, definiti
   return () => {
     if (disposed) return;
     disposed = true;
+    styleObserver?.disconnect();
     if (link) link.onload = link.onerror = null;
     root?.unmount();
     shadow.replaceChildren();

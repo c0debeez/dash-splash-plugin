@@ -1,4 +1,5 @@
 import ast
+import json
 import re
 from pathlib import Path
 from runpy import run_path
@@ -59,8 +60,8 @@ def test_readmes_document_current_setup_and_installation():
         assert "index_string" in readme
         assert "prefers-color-scheme" in readme
         assert "dash_theme_component_id" not in readme
-        assert 'setup(library="loading-ui", loader="fade-arc")' in readme
-        assert 'setup(library="antd", loader="antd")' in readme
+        assert 'setup(loader="loading-ui:fade-arc")' in readme
+        assert 'setup(loader="antd:spin")' in readme
 
         assert "automatically uses the `antd`" not in readme
         assert "自动使用\n`antd` loader" not in readme
@@ -83,6 +84,21 @@ def test_readmes_link_to_each_other():
         assert english_link in readme
 
 
+def test_readmes_document_qualified_api_and_first_paint_inventory():
+    previews = json.loads(
+        (PROJECT_ROOT / "src/dash_splash_plugin/resources/static-loaders.json").read_text()
+    )
+    for name in ("README.md", "README.zh-CN.md"):
+        source = (PROJECT_ROOT / name).read_text(encoding="utf-8")
+        assert "pip install -e ." in source
+        assert "setup(library=" not in source
+        assert "LoaderId" in source and "LoaderLibrary" in source
+        assert str(len(previews)) in source
+        for family in {identifier.split(":", 1)[0] for identifier in previews}:
+            count = sum(identifier.startswith(f"{family}:") for identifier in previews)
+            assert f"| `{family}` | {count} |" in source
+
+
 def test_readme_setup_examples_match_the_current_catalog():
     from dash_splash_plugin import reset_config, setup
 
@@ -92,7 +108,15 @@ def test_readme_setup_examples_match_the_current_catalog():
             examples = re.findall(r"```python\n(.*?)```", source, flags=re.DOTALL)
             calls = 0
             for example in examples:
-                for node in ast.walk(ast.parse(example)):
+                tree = ast.parse(example)
+                constants = {
+                    node.target.id: ast.literal_eval(node.value)
+                    for node in tree.body
+                    if isinstance(node, ast.AnnAssign)
+                    and isinstance(node.target, ast.Name)
+                    and isinstance(node.value, ast.Constant)
+                }
+                for node in ast.walk(tree):
                     if (
                         not isinstance(node, ast.Call)
                         or not isinstance(node.func, ast.Name)
@@ -102,7 +126,11 @@ def test_readme_setup_examples_match_the_current_catalog():
                     options: dict[str, Any] = {}
                     for item in node.keywords:
                         assert item.arg is not None
-                        options[item.arg] = ast.literal_eval(item.value)
+                        options[item.arg] = (
+                            constants[item.value.id]
+                            if isinstance(item.value, ast.Name)
+                            else ast.literal_eval(item.value)
+                        )
                     reset_config()
                     setup(**options)
                     calls += 1
@@ -125,9 +153,9 @@ def test_usage_gallery_defaults_to_blue_without_duplicate_blue_option():
 
     assert preview_colors["default"] == ("Default", "#1890ff")
     assert "blue" not in preview_colors
-    assert "--dash-splash-color:#1890ff" in loader_preview("antd:antd")
-    assert "window.React=parent.React" in loader_preview("antd:antd")
-    assert "--dash-splash-background:#fff" in loader_preview("antd:antd")
+    assert "--dash-splash-color:#1890ff" in loader_preview("antd:spin")
+    assert "parent.React" not in loader_preview("antd:spin")
+    assert "--dash-splash-background:#fff" in loader_preview("antd:spin")
     assert 'data-dash-splash-loader="loading-ui:fade-arc"' in loader_preview(
         "loading-ui:fade-arc"
     )
@@ -140,18 +168,18 @@ def test_gallery_recreates_the_selected_loader_and_never_silently_falls_back():
     gallery = run_path(str(PROJECT_ROOT / "usage.py"))
     update = gallery["update_preview"]
     for name in (
-        "antd:antd",
+        "antd:spin",
         "loading-ui:bobbing-dots",
         "ldrs:ring",
         "loadersz:heatmapping",
     ):
         library, loader = name.split(":", 1)
-        frame, code = update(loader, "green", library)
+        frame, code = update(name, "green", library)
         props = frame.to_plotly_json()["props"]
         assert props["key"] == f"{name}:green"
         assert f'data-dash-splash-loader="{name}"' in props["srcDoc"]
         assert "--dash-splash-color:#52c41a" in props["srcDoc"]
-        assert f"library={library!r}, loader={loader!r}" in code
+        assert f"setup(loader={name!r}" in code
         assert code.startswith("```python\n")
         assert "color='#52c41a'" in code
     with pytest.raises(ValueError, match="Unknown loader"):

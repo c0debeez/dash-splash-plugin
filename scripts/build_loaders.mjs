@@ -6,7 +6,6 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import {shadowStylesheet} from './shadow-css.mjs';
 
-const require = createRequire(import.meta.url);
 const root = process.cwd();
 const ui = process.argv[2];
 const directory = path.join(root, 'build/react-entries');
@@ -47,7 +46,8 @@ const sources = new Map();
 const loaders = {};
 const entries = {};
 for (const item of input) {
-  let metadata = sources.get(item.source);
+  const sourceKey = JSON.stringify([item.source, item.symbol ?? 'default']);
+  let metadata = sources.get(sourceKey);
   if (!metadata) {
     const file = `loader-${sources.size}`;
     const legacy = item.family === 'loading-ui';
@@ -63,7 +63,7 @@ for (const item of input) {
       }
     }
     metadata = { file, properties };
-    sources.set(item.source, metadata);
+    sources.set(sourceKey, metadata);
     const geometry = legacy ? { width: '2rem', height: '2rem' } : undefined;
     if (legacy && item.name.startsWith('text-')) { delete geometry.width; delete geometry.height; geometry.fontSize = '1.25rem'; }
     if (legacy && ['infinity', 'morphing-infinity'].includes(item.name)) Object.assign(geometry, { width: '3rem', height: '3rem' });
@@ -87,24 +87,11 @@ export function mount(host) { return render(host, Component, {family:${JSON.stri
   loaders[item.id] = { family: item.family, minReact: item.family === 'loading-dev' ? 19 : 18, module: `${metadata.file}.js`, defaults: item.defaults ?? {}, options: metadata.properties };
 }
 
+const privateReact = createRequire(path.join(root, 'scripts/react19/package.json'));
 const bridges = {
-  name: 'dash-host-react',
+  name: 'dash-private-react',
   setup(builder) {
-    builder.onResolve({ filter: /^react(?:-dom)?(?:\/.*)?$/ }, args => ({ path: args.path, namespace: 'dash-react' }));
-    builder.onLoad({ filter: /.*/, namespace: 'dash-react' }, args => {
-      if (args.path === 'react/jsx-runtime' || args.path === 'react/jsx-dev-runtime') {
-        return {
-          contents: `const React=window.React;export const Fragment=React.Fragment;
-export function jsx(type, props, key){const config={...props};if(key!==undefined)config.key=key;return React.createElement(type,config);}
-// Static JSX siblings are separate arguments; nested dynamic lists stay arrays.
-export function jsxs(type, props, key){const {children,...config}=props??{};if(key!==undefined)config.key=key;return Array.isArray(children)?React.createElement(type,config,...children):React.createElement(type,config,children);}
-export function jsxDEV(type, props, key, isStaticChildren){return (isStaticChildren?jsxs:jsx)(type,props,key);}`};
-      }
-      const dom = args.path.startsWith('react-dom');
-      const names = Object.keys(require(dom ? 'react-dom' : 'react')).filter(name => /^[A-Za-z_$][\w$]*$/.test(name) && name !== 'default');
-      if (dom) names.push('createRoot', 'hydrateRoot');
-      return { contents: `const host=window.${dom ? 'ReactDOM' : 'React'};export default host;export const {${[...new Set(names)].join(',')}}=host;` };
-    });
+    builder.onResolve({ filter: /^react(?:-dom)?(?:\/.*)?$/ }, args => ({path: privateReact.resolve(args.path)}));
   },
 };
 const result = await build({
@@ -128,6 +115,24 @@ await writeFile(path.join(output, 'manifest.json'), JSON.stringify({ schema_vers
 await writeFile(path.join(root, 'build/react-metafile.json'), JSON.stringify(result.metafile));
 const resources = path.join(root, 'src/dash_splash_plugin/resources');
 await mkdir(resources, { recursive: true });
+const staticBuilder = path.join(root, 'build/static-loaders.cjs');
+const staticFamilies = new Set(['epic', 'flicker', 'spinners', 'spinners-react']);
+const nativeEntries = input.filter(item => staticFamilies.has(item.family));
+const nativeSources = [...new Set(nativeEntries.map(item => item.source))];
+await writeFile(path.join(root, 'build/static-components.mjs'),
+  nativeSources.map((source, index) => `import C${index} from ${JSON.stringify(source)};`).join('\n') +
+  `\nexport const native = [${nativeEntries.map(item => `{id:${JSON.stringify(item.id)},family:${JSON.stringify(item.family)},defaults:${JSON.stringify(item.defaults ?? {})},Component:C${nativeSources.indexOf(item.source)}}`).join(',')}];\n`);
+await rm(staticBuilder.replace(/\.cjs$/, '.css'), {force: true});
+await build({
+  entryPoints: [path.join(root, 'scripts/build_static_loaders.mjs')], outfile: staticBuilder,
+  bundle: true, platform: 'node', format: 'cjs', target: 'node20', jsx: 'automatic',
+  loader: {'.js': 'jsx'},
+  mainFields: ['module', 'main'],
+  external: ['react', 'react-dom', 'react-dom/*', 'jsdom'],
+  define: {'process.env.NODE_ENV': '"production"'},
+});
+execFileSync(process.execPath, [staticBuilder, path.join(resources, 'static-loaders.json')],
+  {env: {...process.env, NODE_ENV: 'production'}});
 await rm(path.join(resources, 'react'), { recursive: true, force: true });
 await rename(output, path.join(resources, 'react'));
 await rename(path.join(resources, 'react/manifest.json'), path.join(resources, 'manifest.json'));

@@ -7,6 +7,7 @@ import math
 import re
 from copy import deepcopy
 from dataclasses import dataclass, fields, replace
+from difflib import get_close_matches
 from functools import cache
 from html import escape
 from importlib.metadata import PackageNotFoundError, version
@@ -19,7 +20,7 @@ from dash import get_app, hooks
 from flask import abort, current_app, has_request_context, request
 from typing_extensions import Unpack
 
-from ._catalog import LoaderLibrary, LoaderName
+from ._catalog import LoaderId, LoaderLibrary
 
 try:
     __version__ = version("dash-splash-plugin")
@@ -107,8 +108,7 @@ class SetupOptions(TypedDict, total=False):
     dark_color: str | None
     text_color: str | None
     dark_text_color: str | None
-    library: LoaderLibrary
-    loader: LoaderName
+    loader: LoaderId
     text: str
     size: int | float | None
     stroke: int | float | None
@@ -136,8 +136,7 @@ class SplashConfig:
     dark_color: str | None = None
     text_color: str | None = None
     dark_text_color: str | None = None
-    library: LoaderLibrary = "loading-ui"
-    loader: LoaderName = "fade-arc"
+    loader: LoaderId = "loading-ui:fade-arc"
     text: str = "Loading"
     size: int | float | None = None
     stroke: int | float | None = None
@@ -180,12 +179,18 @@ def _validate(config: SplashConfig) -> SplashConfig:
     _validate_length("rate", config.rate)
     if config.rate == 0:
         raise ValueError("rate must be greater than zero; use playing=False to pause")
-    if (
-        not isinstance(config.library, str)
-        or not isinstance(config.loader, str)
-        or f"{config.library}:{config.loader}" not in _LOADER_NAMES
-    ):
-        raise ValueError("library and loader must select a supported animation")
+    if not isinstance(config.loader, str) or config.loader not in _LOADER_NAMES:
+        message = (
+            f"Unknown loader: {config.loader!r}. "
+            "Use a qualified 'library:name' identifier."
+        )
+        if isinstance(config.loader, str):
+            matches = get_close_matches(
+                config.loader, sorted(_LOADER_NAMES), n=3, cutoff=0.5
+            )
+            if matches:
+                message += f" Did you mean {', '.join(repr(name) for name in matches)}?"
+        raise ValueError(message)
     if config.loader_options is not None:
         if not isinstance(config.loader_options, dict):
             raise TypeError("loader_options must be a JSON object")
@@ -199,7 +204,7 @@ def _validate(config: SplashConfig) -> SplashConfig:
             raise ValueError(
                 "loader_options must contain only JSON objects, arrays and scalar values"
             )
-        schema = _MANIFEST["loaders"][f"{config.library}:{config.loader}"]["options"]
+        schema = _MANIFEST["loaders"][config.loader]["options"]
         if schema:
             unknown = set(config.loader_options) - set(schema)
             if unknown:
@@ -274,17 +279,17 @@ def _matches_schema(value: Any, schema: dict[str, Any]) -> bool:
     return isinstance(value, expected[kind]) if kind in expected else True
 
 
-def list_libraries() -> tuple[str, ...]:
+def list_libraries() -> tuple[LoaderLibrary, ...]:
     """Return the available kebab-case animation library names."""
     return tuple(sorted({item["family"] for item in _MANIFEST["loaders"].values()}))
 
 
-def list_loaders(library: str | None = None) -> tuple[str, ...]:
-    """Return qualified identifiers, or short loader names for one library."""
+def list_loaders(library: LoaderLibrary | None = None) -> tuple[LoaderId, ...]:
+    """Return qualified identifiers accepted by setup, optionally filtered by library."""
     if library is not None and library not in list_libraries():
         raise ValueError(f"Unknown loader library: {library}")
     return tuple(
-        name if library is None else name.split(":", 1)[1]
+        name
         for name, item in _MANIFEST["loaders"].items()
         if library is None or item["family"] == library
     )
@@ -295,8 +300,8 @@ def setup(**changes: Unpack[SetupOptions]) -> SplashConfig:
 
     Call this before creating ``dash.Dash``. The Dash hooks registry is
     process-wide, so one configuration is shared by all apps in the process.
-    Use ``setup(library="flicker", loader="mail")``. A loader without a library
-    selects from the default ``loading-ui`` library.
+    Use ``setup(loader="flicker:mail")``. Loader identifiers always include
+    their library; omitted options keep their current values.
     """
 
     valid_names = {field.name for field in fields(SplashConfig)}
@@ -306,18 +311,7 @@ def setup(**changes: Unpack[SetupOptions]) -> SplashConfig:
         raise TypeError(f"Unknown splash option(s): {names}")
     global _config
     with _CONFIG_LOCK:
-        if "loader" in changes and "library" not in changes:
-            changes["library"] = "loading-ui"
-        if "library" in changes and "loader" not in changes:
-            names = list_loaders(changes["library"])
-            changes["loader"] = cast(
-                LoaderName,
-                "fade-arc" if changes["library"] == "loading-ui" else names[0],
-            )
-        if (
-            changes.get("library", _config.library),
-            changes.get("loader", _config.loader),
-        ) != (_config.library, _config.loader):
+        if changes.get("loader", _config.loader) != _config.loader:
             changes.setdefault("loader_options", None)
         _config = _validate(deepcopy(replace(_config, **changes)))
         return deepcopy(_config)
@@ -401,12 +395,32 @@ def _loader_markup(config: SplashConfig, loader: str) -> str:
         if item.get("css")
         else ""
     )
+    content = '<span class="dash-splash__fallback" aria-hidden="true"></span>'
+    standalone = ""
+    preview = _static_loader_previews().get(loader)
+    if preview is not None:
+        mode = "preview" if config.loader_options else "true"
+        standalone = f' data-dash-splash-static="{mode}"'
+        content = (
+            '<template shadowrootmode="open">'
+            '<style data-css-hash="dash-splash-static">'
+            ':host{display:inline-flex;color:inherit;max-width:100%}'
+            '.viewport{position:relative;display:inline-flex}'
+            '.artwork{display:inline-flex;transform-origin:top left}'
+            '.artwork *,.artwork *::before,.artwork *::after{'
+            'animation-play-state:var(--dash-splash-play-state,running)}'
+            '@media(prefers-reduced-motion:reduce){.artwork *,.artwork *::before,'
+            '.artwork *::after{animation-play-state:paused!important}}'
+            f'{preview["css"]}</style>'
+            f'<div class="viewport"><div class="artwork">{preview["html"]}</div></div>'
+            '</template>'
+        )
     return (
         f'<span class="dash-splash__loader" data-dash-splash-loader="{escape(loader, quote=True)}" '
-        f'data-dash-splash-module="{escape(base + item["module"], quote=True)}"{css} '
+        f'data-dash-splash-module="{escape(base + item["module"], quote=True)}"{css}{standalone} '
         f'data-dash-splash-react-min="{item.get("minReact", 18)}" '
         f'data-dash-splash-config="{encoded}" aria-hidden="true">'
-        '<span class="dash-splash__fallback" aria-hidden="true"></span></span>'
+        f'{content}</span>'
     )
 
 
@@ -427,6 +441,11 @@ def _overlay_html(config: SplashConfig, loader: str) -> str:
         f'<div class="dash-splash__content">{loader_html}</div>'
         "</div>"
     )
+
+
+@cache
+def _static_loader_previews() -> dict[str, dict[str, str]]:
+    return json.loads(_resource_text("static-loaders.json"))
 
 
 @cache
@@ -481,7 +500,7 @@ def _inject_overlay(app_index: str) -> str:
     if body is None:
         return app_index
 
-    loader = f"{config.library}:{config.loader}"
+    loader = config.loader
     return (
         _with_splash_runtime(app_index[: body.end()])
         + _overlay_html(config, loader)

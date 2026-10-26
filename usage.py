@@ -5,7 +5,13 @@ from html import escape
 
 from dash import Dash, Input, Output, dcc, html
 
-from dash_splash_plugin import get_config, list_libraries, list_loaders, setup
+from dash_splash_plugin import (
+    LoaderLibrary,
+    get_config,
+    list_libraries,
+    list_loaders,
+    setup,
+)
 from dash_splash_plugin.plugin import _overlay_html, _resource_text
 
 setup()
@@ -21,15 +27,13 @@ PREVIEW_COLORS = {
 
 
 def loader_preview(name: str, color: str = "default") -> str:
-    """Share the parent Dash React instance; do not download another React."""
+    """Render an isolated preview without depending on the parent React runtime."""
     if name not in LOADER_NAMES:
         raise ValueError(f"Unknown loader: {name}")
     preview_color = PREVIEW_COLORS.get(color, PREVIEW_COLORS["default"])[1]
-    library, loader = name.split(":", 1)
     config = replace(
         get_config(),
-        library=library,
-        loader=loader,
+        loader=name,
         color=preview_color,
         size=64,
         background="#fff",
@@ -40,8 +44,7 @@ def loader_preview(name: str, color: str = "default") -> str:
         f"<title>{escape(name)}</title><script>{_resource_text('splash.js')}</script>"
         '</head><body style="margin:0">'
         f"{_overlay_html(config, name)}"
-        "<script>window.React=parent.React;window.ReactDOM=parent.ReactDOM;"
-        "window.__dashSplashStart();</script></body></html>"
+        "<script>window.__dashSplashStart();</script></body></html>"
     )
 
 
@@ -76,9 +79,10 @@ app.layout = html.Main(
         dcc.Dropdown(
             id="loader-name",
             searchable=True,
-            value="fade-arc",
+            value="loading-ui:fade-arc",
             options=[
-                {"value": name, "label": name} for name in list_loaders("loading-ui")
+                {"value": name, "label": name.split(":", 1)[1]}
+                for name in list_loaders("loading-ui")
             ],
             clearable=False,
         ),
@@ -118,10 +122,11 @@ app.layout = html.Main(
     Output("loader-name", "value"),
     Input("loader-library", "value"),
 )
-def select_library(library: str):
+def select_library(library: LoaderLibrary):
     names = list_loaders(library)
-    selected = "fade-arc" if library == "loading-ui" else names[0]
-    return [{"value": name, "label": name} for name in names], selected
+    selected = "loading-ui:fade-arc" if library == "loading-ui" else names[0]
+    options = [{"value": name, "label": name.split(":", 1)[1]} for name in names]
+    return options, selected
 
 
 @app.callback(
@@ -131,7 +136,7 @@ def select_library(library: str):
     Input("loader-color", "value"),
     Input("loader-library", "value"),
 )
-def update_preview(name: str, color: str, library: str) -> tuple[html.Iframe, str]:
+def update_preview(name: str, color: str, library: LoaderLibrary) -> tuple[html.Iframe, str]:
     # A library change can arrive before its dependent animation callback.
     if name not in list_loaders(library):
         from dash.exceptions import PreventUpdate
@@ -140,9 +145,9 @@ def update_preview(name: str, color: str, library: str) -> tuple[html.Iframe, st
     preview_color = PREVIEW_COLORS.get(color, PREVIEW_COLORS["default"])[1]
     code = (
         "from dash_splash_plugin import setup\n\n"
-        f"setup(library={library!r}, loader={name!r}, color={preview_color!r}, size=64)"
+        f"setup(loader={name!r}, color={preview_color!r}, size=64)"
     )
-    return preview_frame(f"{library}:{name}", color), f"```python\n{code}\n```"
+    return preview_frame(name, color), f"```python\n{code}\n```"
 
 
 if __name__ == "__main__":

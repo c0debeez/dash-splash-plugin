@@ -1,0 +1,5 @@
+import{a as o}from"./shared-QQL2K63A.js";var d=o(a=>{"use strict";Object.defineProperty(a,"__esModule",{value:!0});a.parseLengthAndUnit=s;a.cssValue=m;var v={cm:!0,mm:!0,in:!0,px:!0,pt:!0,pc:!0,em:!0,ex:!0,ch:!0,rem:!0,vw:!0,vh:!0,vmin:!0,vmax:!0,"%":!0};function s(t){if(typeof t=="number")return{value:t,unit:"px"};var e,r=(t.match(/^[0-9.]*/)||"").toString();r.includes(".")?e=parseFloat(r):e=parseInt(r,10);var n=(t.match(/[^0-9]*$/)||"").toString();return v[n]?{value:e,unit:n}:(console.warn("React Spinners: ".concat(t," is not a valid css value. Defaulting to ").concat(e,"px.")),{value:e,unit:"px"})}function m(t){var e=s(t);return"".concat(e.value).concat(e.unit)}});var f=o(u=>{"use strict";Object.defineProperty(u,"__esModule",{value:!0});u.createAnimation=void 0;var p=function(t,e,r){var n="react-spinners-".concat(t,"-").concat(r);if(typeof window>"u"||!window.document)return n;var c=document.createElement("style");document.head.appendChild(c);var i=c.sheet,l=`
+    @keyframes `.concat(n,` {
+      `).concat(e,`
+    }
+  `);return i&&i.insertRule(l,0),n};u.createAnimation=p});export{d as a,f as b};

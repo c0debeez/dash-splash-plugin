@@ -1,0 +1,1 @@
+import{b as e}from"./shared-BZJBV7O6.js";import"./shared-MDXWYKGH.js";import{o as n}from"./shared-QQL2K63A.js";function i(o){return n(o,e,{family:"antd",geometry:void 0,visualScale:void 0,bindPlayback:void 0})}export{i as mount};

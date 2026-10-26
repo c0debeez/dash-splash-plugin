@@ -10,6 +10,9 @@
   },
   "dependencies": {
     "@alerix/m3-loading-indicator": "1.0.5",
+    "@ant-design/cssinjs": "2.1.2",
+    "@ant-design/icons": "6.3.4",
+    "antd": "6.6.7",
     "clsx": "2.1.1",
     "flicker-dot": "0.2.0",
     "gridora": "0.3.0",
@@ -35,6 +38,7 @@
     "@types/react": "18.3.31",
     "@types/react-dom": "18.3.7",
     "esbuild": "0.28.2",
+    "jsdom": "26.1.0",
     "lightningcss": "1.32.0",
     "playwright": "1.58.2",
     "tailwindcss": "4.3.3",

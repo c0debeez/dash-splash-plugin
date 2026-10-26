@@ -48,6 +48,7 @@ where = ["src"]
 dash_splash_plugin = [
 	"resources/splash.js",
 	"resources/manifest.json",
+	"resources/static-loaders.json",
 	"resources/react/*.js",
 	"resources/react/*.css",
 	"resources/licenses/*",

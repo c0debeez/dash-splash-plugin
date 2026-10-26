@@ -55,13 +55,15 @@ test('CSS, Motion and Canvas animate, pause and follow root theme changes', asyn
   await page.close();
 });
 
-test('every registered animation renders with the host React, without console errors', {timeout: 300000}, async () => {
+test('every registered animation renders without changing host React or console errors', {timeout: 300000}, async () => {
   const page = await browser.newPage({viewport: {width: 375, height: 640}});
+  const noHostReact = process.env.NO_HOST_REACT === '1';
+  if (noHostReact) await page.route('**/host-react*.js*', route => route.fulfill({contentType: 'text/javascript', body: ''}));
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
   const identifiers = process.env.ALL_LOADERS === '1' ? Object.keys(manifest.loaders) : [
-    'antd:antd', 'loading-ui:fade-arc', 'loading-ui:bobbing-dots', 'loading-ui:text-shimmer', 'loading-ui:morphing-infinity',
+    'antd:spin', 'antd:loading', 'antd:progress', 'antd:skeleton', 'loading-ui:fade-arc', 'loading-ui:bobbing-dots', 'loading-ui:text-shimmer', 'loading-ui:morphing-infinity',
     'loading-dev:arc', 'spinners:clip', 'spinners-react:spinner-circular',
     'ldrs:ring', 'loader-spinner:ball-triangle', 'premium:spinner-circle', 'indicators:atom',
     'm3:loading-indicator', ...Object.keys(manifest.loaders).filter(id => id.startsWith('epic:')),
@@ -71,27 +73,152 @@ test('every registered animation renders with the host React, without console er
   for (const id of identifiers) {
     errors.length = 0;
     await page.goto(`${base}/preview?loader=${encodeURIComponent(id)}`);
-    if (Number.parseInt(reactVersion, 10) < manifest.loaders[id].minReact) {
-      await page.waitForSelector('[data-dash-splash-unsupported-react]');
-      assert.equal(await page.locator('[data-dash-splash-enhanced]').count(), 0, id);
-      assert.equal(await page.locator('.dash-splash__fallback').isVisible(), true, id);
-      assert.deepEqual(errors, [], id);
-      continue;
-    }
     try { await page.waitForSelector('[data-dash-splash-enhanced="true"]', {timeout: 8000}); }
     catch (error) { throw new Error(`${id}: ${error.message}; errors=${JSON.stringify(errors)}`); }
     const result = await page.locator('[data-dash-splash-loader]').evaluate(host => {
       const art = host.shadowRoot.querySelector('.artwork');
       const rect = host.getBoundingClientRect();
       return {nodes: art.querySelectorAll('*').length,
-        width: rect.width, height: rect.height, react: window.React.version};
+        width: rect.width, height: rect.height, react: window.React?.version};
     });
     assert.ok(result.nodes > 0, `${id}: empty artwork`);
     assert.ok(result.width > 0 && result.height > 0 && result.width <= 375, `${id}: ${JSON.stringify(result)}`);
-    assert.equal(result.react, reactVersion);
+    assert.equal(result.react, noHostReact ? undefined : reactVersion);
     assert.deepEqual(errors, [], id);
   }
   await page.close();
+});
+
+test('native Ant Design presets have isolated styles, animation, theme and playback controls', async () => {
+  const page = await browser.newPage({viewport: {width: 375, height: 640}});
+  const selectors = {
+    spin: '.ant-spin-dot-item', loading: '.anticon-loading',
+    progress: '.ant-progress', skeleton: '.ant-skeleton-paragraph',
+  };
+  try {
+    for (const [name, selector] of Object.entries(selectors)) {
+      await page.goto(`${base}/preview?loader=antd:${name}&rate=2`);
+      const host = page.locator('[data-dash-splash-enhanced="true"]');
+      await host.waitFor();
+      await page.waitForTimeout(300);
+      const inspect = () => host.evaluate((element, selector) => {
+        const shadow = element.shadowRoot;
+        const native = shadow.querySelector(selector);
+        const animations = shadow.querySelector('.artwork').getAnimations({subtree: true})
+          .filter(animation => animation instanceof CSSAnimation);
+        return {
+          native: !!native, styles: shadow.querySelectorAll('style[data-css-hash]').length,
+          primary: getComputedStyle(shadow.querySelector('.ant-spin, .ant-progress, .ant-skeleton')).color,
+          running: animations.filter(animation => animation.playState === 'running').length,
+          rates: animations.map(animation => animation.playbackRate),
+          width: element.getBoundingClientRect().width,
+        };
+      }, selector);
+      const active = await inspect();
+      assert.equal(active.native, true, name);
+      assert.ok(active.styles > 0, `${name}: CSS was not injected into the shadow`);
+      assert.ok(active.running > 0, `${name}: no native animation`);
+      assert.ok(active.rates.every(rate => rate === 2), `${name}: rate ignored`);
+      assert.ok(active.width > 0 && active.width <= 375, `${name}: invalid geometry`);
+      await page.evaluate(() => { document.documentElement.className = 'dark'; });
+      await page.waitForTimeout(150);
+      const dark = await inspect();
+      assert.equal(dark.primary, 'rgb(255, 255, 255)', `${name}: theme color ignored`);
+      assert.ok(dark.rates.every(rate => rate === 2), `${name}: theme reset the rate`);
+      await page.goto(`${base}/preview?loader=antd:${name}&playing=false`);
+      await page.waitForSelector('[data-dash-splash-enhanced="true"]');
+      await page.waitForTimeout(500);
+      assert.equal((await inspect()).running, 0, `${name}: pause ignored`);
+      const paused = await host.screenshot();
+      await page.waitForTimeout(250);
+      assert.ok(paused.equals(await host.screenshot()), `${name}: paused image changed`);
+      await page.emulateMedia({reducedMotion: 'reduce'});
+      await page.goto(`${base}/preview?loader=antd:${name}`);
+      await page.waitForSelector('[data-dash-splash-enhanced="true"]');
+      assert.equal((await inspect()).running, 0, `${name}: reduced motion ignored`);
+      await page.emulateMedia({reducedMotion: 'no-preference'});
+    }
+  } finally {
+    await page.close();
+  }
+});
+
+test('pre-rendered loaders animate before React with no component module requests', async () => {
+  const page = await browser.newPage();
+  const modules = [];
+  page.on('request', request => {
+    if (request.url().includes('/_dash-splash-plugin/react/')) modules.push(request.url());
+  });
+  await page.route('**/host-react*.js*', route => route.abort());
+  try {
+    for (const name of [...Object.keys(manifest.loaders).filter(name => /^(antd|epic|spinners|spinners-react):/.test(name)),
+      'flicker:helix', 'flicker:mycelium']) {
+      await page.goto(`${base}/preview?loader=${name}`);
+      const host = page.locator('[data-dash-splash-enhanced="true"]');
+      await host.waitFor();
+      assert.equal(await page.evaluate(() => typeof window.React), 'undefined');
+      assert.equal(await page.locator('.dash-splash__fallback').count(), 0);
+      const animations = await host.evaluate(element => element.shadowRoot.querySelector('.artwork')
+        .getAnimations({subtree: true}).filter(animation => animation.playState === 'running').length);
+      assert.ok(animations > 0, `${name}: static markup is not animated`);
+      // Progress deliberately holds its first keyframe for 20% of the cycle.
+      await page.waitForTimeout(750);
+      const first = await host.screenshot();
+      await page.waitForTimeout(250);
+      assert.notDeepEqual(first, await host.screenshot(), `${name}: artwork does not move without React`);
+      assert.deepEqual(modules, [], `${name}: requested a React component module`);
+      await page.evaluate(() => { document.querySelector('#react-entry-point').innerHTML = '<main>Ready</main>'; });
+      await page.waitForSelector('[data-dash-splash]', {state: 'detached'});
+    }
+  } finally {
+    await page.close();
+  }
+});
+
+test('advanced options upgrade the pre-rendered preview to its native component', async () => {
+  const page = await browser.newPage();
+  try {
+    const options = encodeURIComponent(JSON.stringify({animation_duration: 1600}));
+    await page.goto(`${base}/preview?loader=epic:spring&options=${options}`);
+    await page.waitForFunction(() => {
+      const host = document.querySelector('[data-dash-splash-enhanced="true"]');
+      return host?.shadowRoot && !host.shadowRoot.querySelector('style[data-css-hash="dash-splash-static"]');
+    });
+    const durations = await page.locator('[data-dash-splash-loader]').evaluate(host =>
+      host.shadowRoot.querySelector('.artwork').getAnimations({subtree: true})
+        .map(animation => animation.effect.getTiming().duration));
+    assert.ok(durations.includes(1600), JSON.stringify(durations));
+  } finally {
+    await page.close();
+  }
+});
+
+test('spinners dynamic keyframes survive advanced options and theme updates', async () => {
+  const page = await browser.newPage();
+  await page.route('**/host-react*.js*', route => route.fulfill({contentType: 'text/javascript', body: ''}));
+  try {
+    const options = encodeURIComponent(JSON.stringify({size: 48}));
+    await page.goto(`${base}/preview?loader=spinners:hash&options=${options}`);
+    await page.waitForFunction(() => {
+      const shadow = document.querySelector('[data-dash-splash-enhanced="true"]')?.shadowRoot;
+      return shadow && !shadow.querySelector('style[data-css-hash="dash-splash-static"]') &&
+        (shadow.querySelector('.artwork')?.getAnimations({subtree: true}).length ?? 0) >= 2;
+    });
+    await page.evaluate(() => { document.documentElement.className = 'dark'; });
+    await page.waitForFunction(() => {
+      const artwork = document.querySelector('[data-dash-splash-loader]').shadowRoot.querySelector('.artwork');
+      return getComputedStyle(artwork).color === 'rgb(255, 255, 255)' &&
+        artwork.getAnimations({subtree: true}).length >= 2 &&
+        [...artwork.querySelectorAll('span')].some(node => getComputedStyle(node).boxShadow.includes('255, 255, 255'));
+    });
+    const host = page.locator('[data-dash-splash-loader]');
+    const first = await host.screenshot();
+    await page.waitForTimeout(250);
+    assert.notDeepEqual(first, await host.screenshot());
+    assert.equal(await page.evaluate(() => typeof window.React), 'undefined');
+  } finally {
+    await page.close();
+  }
 });
 
 test('development React accepts static JSX siblings and still warns for unkeyed dynamic lists', async () => {
@@ -100,7 +227,7 @@ test('development React accepts static JSX siblings and still warns for unkeyed 
   page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
   page.on('pageerror', error => errors.push(error.message));
   try {
-    for (const id of ['antd:antd', 'loading-ui:fade-arc', 'loading-ui:text-shimmer', 'ldrs:ring']) {
+    for (const id of ['antd:spin', 'antd:loading', 'antd:progress', 'antd:skeleton', 'loading-ui:fade-arc', 'loading-ui:text-shimmer', 'ldrs:ring']) {
       errors.length = 0;
       await page.goto(`${base}/preview?loader=${encodeURIComponent(id)}&development=true`);
       await page.waitForSelector('[data-dash-splash-enhanced="true"]');
@@ -187,10 +314,9 @@ test('fallback, theme, pause, reduced motion, cleanup, and slow module races', a
   const page = await browser.newPage();
   await page.route('**/host-react.js', route => route.abort());
   await page.goto(`${base}/preview`);
-  assert.equal(await page.locator('.dash-splash__fallback').isVisible(), true);
-  assert.equal(await page.locator('[data-dash-splash-enhanced]').count(), 0);
+  await page.waitForSelector('[data-dash-splash-enhanced="true"]');
   await page.unroute('**/host-react.js');
-  await page.goto(`${base}/preview?loader=antd:antd&playing=false&theme=dark`);
+  await page.goto(`${base}/preview?loader=antd:spin&playing=false&theme=dark`);
   await page.waitForSelector('[data-dash-splash-enhanced="true"]');
   assert.equal(await page.locator('[data-dash-splash]').evaluate(el => getComputedStyle(el).backgroundColor), 'rgb(0, 0, 0)');
   assert.equal(await page.locator('[data-dash-splash-loader]').evaluate(el => getComputedStyle(el).color), 'rgb(255, 255, 255)');
@@ -209,13 +335,13 @@ test('fallback, theme, pause, reduced motion, cleanup, and slow module races', a
   assert.equal(await page.locator('[data-dash-splash]').count(), 0);
   await page.unroute('**/_dash-splash-plugin/react/*.js');
   await page.emulateMedia({reducedMotion: 'reduce'});
-  await page.goto(`${base}/preview?loader=antd:antd`);
+  await page.goto(`${base}/preview?loader=antd:spin`);
   await page.waitForSelector('[data-dash-splash-enhanced="true"]');
   assert.equal(await page.locator('[data-dash-splash-loader]').evaluate(host => !!host.shadowRoot.querySelector('.dlc-paused')), true);
   await page.close();
 });
 
-test('native speed and playback options override common configuration', {skip: Number.parseInt(reactVersion, 10) < 19}, async () => {
+test('native speed and playback options override common configuration', async () => {
   const page = await browser.newPage();
   const options = encodeURIComponent(JSON.stringify({duration: 1600, play_state: 'running'}));
   await page.goto(`${base}/preview?loader=loading-dev:arc&rate=2&playing=false&options=${options}`);
@@ -228,13 +354,12 @@ test('native speed and playback options override common configuration', {skip: N
   await page.close();
 });
 
-test('old React, module errors, stylesheet errors and duplicate startup retain safe fallbacks', async () => {
+test('host React is isolated; module errors and stylesheet errors retain safe fallbacks', async () => {
   const page = await browser.newPage();
   await page.route('**/host-react.js', route => route.fulfill({contentType: 'text/javascript',
     body: 'window.React={version:"17.0.2"};'}));
   await page.goto(`${base}/preview`);
-  assert.equal(await page.locator('.dash-splash__fallback').isVisible(), true);
-  assert.equal(await page.locator('[data-dash-splash-enhanced]').count(), 0);
+  await page.waitForSelector('[data-dash-splash-enhanced="true"]');
   await page.unroute('**/host-react.js');
   await page.route('**/_dash-splash-plugin/react/loader-*.js', route => route.fulfill({contentType: 'text/javascript',
     body: 'export function mount(){throw new Error("Test render failure")}'}));
@@ -247,7 +372,7 @@ test('old React, module errors, stylesheet errors and duplicate startup retain s
   await page.waitForSelector('[data-dash-splash-error="render"]');
   assert.equal(await page.locator('.dash-splash__fallback').isVisible(), true);
   await page.unroute('**/_dash-splash-plugin/react/*.css');
-  await page.goto(`${base}/preview?loader=antd:antd`);
+  await page.goto(`${base}/preview?loader=antd:spin`);
   await page.waitForSelector('[data-dash-splash-enhanced="true"]');
   await page.evaluate(() => { window.__dashSplashStart(); window.__dashSplashStart(); });
   assert.equal(await page.locator('[data-dash-splash]').count(), 1);
@@ -281,7 +406,7 @@ test('usage gallery switches real callback previews across animation families', 
     const preview = page.frameLocator('#loader-preview');
     await preview.locator('[data-dash-splash-enhanced="true"]').waitFor();
     let selectedLibrary = 'loading-ui';
-    for (const id of ['antd:antd', 'loading-ui:bobbing-dots', 'loading-ui:orbit-ring', 'loading-ui:concentric-ring',
+    for (const id of ['antd:spin', 'antd:loading', 'antd:progress', 'antd:skeleton', 'loading-ui:bobbing-dots', 'loading-ui:orbit-ring', 'loading-ui:concentric-ring',
       'loading-ui:pulse', 'loading-ui:quarter-ring', 'ldrs:ring', 'loadersz:heatmapping', 'flicker:mail']) {
       const [library, name] = id.split(':');
       if (library !== selectedLibrary) {
@@ -289,9 +414,9 @@ test('usage gallery switches real callback previews across animation families', 
         await page.waitForFunction(value => document.querySelector('#loader-preview').srcdoc.includes(`data-dash-splash-loader="${value}:`), library);
         selectedLibrary = library;
       }
-      await page.evaluate(value => window.dash_clientside.set_props('loader-name', {value}), name);
+      await page.evaluate(value => window.dash_clientside.set_props('loader-name', {value}), id);
       await preview.locator(`[data-dash-splash-loader="${id}"][data-dash-splash-enhanced="true"]`).waitFor();
-      assert.ok((await page.locator('#loader-code').textContent()).includes(`loader='${name}'`));
+      assert.ok((await page.locator('#loader-code').textContent()).includes(`loader='${id}'`));
       const module = await preview.locator('[data-dash-splash-loader]').getAttribute('data-dash-splash-module');
       assert.ok(module.endsWith(manifest.loaders[id].module), `${id}: stale module ${module}`);
       if (['orbit-ring', 'concentric-ring', 'pulse', 'quarter-ring'].includes(name)) {

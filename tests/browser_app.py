@@ -21,10 +21,8 @@ app.layout = html.Div("Ready")
 @app.server.get("/preview")
 def preview():
     reset_config()
-    library, loader = request.args.get("loader", "loading-ui:fade-arc").split(":", 1)
     setup(
-        library=library,
-        loader=loader,
+        loader=request.args.get("loader", "loading-ui:fade-arc"),
         size=64,
         rate=float(request.args.get("rate", 1)),
         loader_options=json.loads(request.args.get("options", "{}")),
