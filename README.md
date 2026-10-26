@@ -309,6 +309,9 @@ uv run pytest -q
 ```
 
 To rebuild, run `npm ci` then `uv run python scripts/build_loaders.py`.
+Frontend rebuilding requires a Git checkout. Python wheels and source
+distributions include the Python runtime, prebuilt assets, typing files and
+licenses, but exclude `scripts/`, npm configuration, tests and demo files.
 The build fetches exact upstream commits, generates the registry and Python
 literal, and bundles native React modules with one shared, private React 19 runtime.
 The `scripts/react19` workspace isolates these browser runtime dependencies from

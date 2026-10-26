@@ -39,10 +39,12 @@ dash_splash_plugin = "dash_splash_plugin"
 
 [tool.setuptools]
 package-dir = { "" = "src" }
-include-package-data = true
+include-package-data = false
 
 [tool.setuptools.packages.find]
 where = ["src"]
+include = ["dash_splash_plugin", "dash_splash_plugin.*"]
+namespaces = false
 
 [tool.setuptools.package-data]
 dash_splash_plugin = [

@@ -1,5 +1,5 @@
 prune tests
-include package.json package-lock.json tsconfig.json
-recursive-include scripts *.py *.mjs *.ts *.tsx *.js *.css
-prune scripts/react19/node_modules
-include scripts/react19/package.json
+prune scripts
+prune docs
+exclude package.json package-lock.json tsconfig.json usage.py
+include README.md README.zh-CN.md

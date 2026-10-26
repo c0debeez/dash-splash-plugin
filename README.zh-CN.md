@@ -278,6 +278,8 @@ uv run pytest -q
 ```
 
 重新构建时运行 `npm ci` 和 `uv run python scripts/build_loaders.py`。
+重建前端需要使用 Git 仓库源码。Python wheel 和源码包只包含 Python 运行时代码、
+预构建资源、类型文件和许可证，不包含 `scripts/`、npm 配置、测试和演示文件。
 构建锁定上游提交，自动生成清单和 Python 字面量类型，并将私有 React 19 运行时打包为共享分包。
 `scripts/react19` workspace 将浏览器运行时依赖与 React 18 的服务端预渲染和类型基线隔离。
 生成清单记录上游最低版本，私有运行时满足这些要求，无需修改宿主版本。
