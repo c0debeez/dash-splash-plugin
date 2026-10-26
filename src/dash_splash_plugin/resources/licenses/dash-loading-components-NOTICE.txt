@@ -1,0 +1,51 @@
+dash-loading-components (dlc)
+Copyright (c) 2026 Phyla Technologies
+
+This package is licensed under the MIT License (see LICENSE).
+
+It wraps and redistributes third-party loading-indicator libraries under their
+own licenses. Full upstream inventory (npm name, version, SPDX license,
+homepage/repo URLs, React peers, wrap status) lives in:
+
+  docs/UPSTREAM-INVENTORY.md
+
+Notable upstream projects (non-exhaustive; see inventory for pins and status):
+
+  - loading-dev / loading.dev (jakubkrehel/loading) — MIT
+  - ldrs (GriffinJohnston/ldrs) — MIT
+  - react-spinners (davidhu2000/react-spinners) — MIT
+  - spinners-react — MIT
+  - react-loader-spinner — MIT
+  - premium-react-loaders — MIT
+  - react-loading-indicators — MIT
+  - react-svg-spinners — MIT (gated: React ^18.2 peer)
+  - @alerix/m3-loading-indicator — Apache-2.0
+  - react-epic-spinners — MIT
+  - flicker-dot (laurieesc/flicker-dot) — MIT. The dlc.flicker presets are
+    original PhylaTech designs under this package's MIT license; none of the
+    flicker.laurie.fyi gallery patterns are included.
+  - gridora (0x65dgerunner/gridora) -- MIT. 133 motion variants and bitmap-font
+    text, wrapped as dlc.gridora.GridLoader and dlc.gridora.Text. The studio
+    site (gridora.gabrielayer.com) patterns are not redistributed.
+  - loadersz (lumberjacque/loadersz-core) -- MIT. 160 canvas-based loading
+    animations as a native Web Component, wrapped as dlc.loadersz.Loader.
+    Includes chart-shaped loaders (heatmap, sankey, treemap, candlestick,
+    bar chart) suited for data dashboards.
+    Note: the first nine semantic state names (working, searching, connecting,
+    weaving, shaping, listening, breathing, composing, solving) overlap with
+    thinking-orbs (Jakub Antalik, MIT). The two libraries are independently
+    implemented: loadersz is a framework-agnostic Web Component using its own
+    canvas renderer with Dot/OrbLine/OrbRect/OrbArc primitives, while
+    thinking-orbs is a React-only 3D dotted-sphere renderer. The shared names
+    describe common AI/agent activity verbs. No code or assets are copied.
+  - thinking-orbs (Jakubantalik/Libraries.dev) -- MIT. Nine dotted-sphere canvas
+    orbs for AI and agent status, wrapped as dlc.thinking_orbs.Orb. Not to be
+    confused with the unrelated @yogesharc/thinking-orbs package, which is not
+    wrapped.
+  - dlc.lab is PhylaTech's own work (MIT, this repo): two SVG spinners, HplcTrace
+    and WellPlate. No third-party code or assets.
+
+Hard skips (not wrapped): css-spinners (GPL-3.0), react18-loaders (MPL-2.0).
+
+When redistributing this package, retain this NOTICE and the inventory document
+so third-party attribution remains intact.

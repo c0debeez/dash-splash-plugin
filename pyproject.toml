@@ -3,8 +3,8 @@ requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "dash-startup-loading-plugin"
-version = "3.0.0"
+name = "dash-splash-plugin"
+version = "0.1.0"
 description = "A configurable full-screen startup loading overlay for Dash apps, packaged as a Dash Hooks plugin."
 readme = "README.md"
 requires-python = ">=3.9"
@@ -21,20 +21,21 @@ classifiers = [
 	"Programming Language :: Python :: 3.13",
 ]
 license = "MIT"
-license-files = ["LICENSE"]
-dependencies = ["dash>=3.0.3", "typing-extensions>=4.11"]
+license-files = ["LICENSE", "src/dash_splash_plugin/resources/licenses/*"]
+dependencies = ["dash>=4.5.0rc0", "typing-extensions>=4.11"]
 
 [project.urls]
-"Homepage" = "https://github.com/c0debeez/dash-startup-loading-plugin"
-"Bug Reports" = "https://github.com/c0debeez/dash-startup-loading-plugin/issues"
-"Source" = "https://github.com/c0debeez/dash-startup-loading-plugin"
+"Homepage" = "https://github.com/c0debeez/dash-splash-plugin"
+"Bug Reports" = "https://github.com/c0debeez/dash-splash-plugin/issues"
+"Source" = "https://github.com/c0debeez/dash-splash-plugin"
 
 
 [dependency-groups]
+dev = ["dash==4.5.0rc2"]
 test = ["pytest>=8"]
 
 [project.entry-points."dash_hooks"]
-dash_startup_loading_plugin = "dash_startup_loading_plugin"
+dash_splash_plugin = "dash_splash_plugin"
 
 [tool.setuptools]
 package-dir = { "" = "src" }
@@ -44,12 +45,16 @@ include-package-data = true
 where = ["src"]
 
 [tool.setuptools.package-data]
-dash_startup_loading_plugin = [
-	"resources/startup-loading.js",
-	"resources/loading-ui/*.js",
+dash_splash_plugin = [
+	"resources/splash.js",
+	"resources/manifest.json",
+	"resources/react/*.js",
+	"resources/react/*.css",
+	"resources/licenses/*",
 	"py.typed",
 ]
 
 [tool.pytest.ini_options]
 addopts = "-q -p no:cacheprovider"
 testpaths = ["tests"]
+pythonpath = ["src"]

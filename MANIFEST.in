@@ -1,1 +1,4 @@
 prune tests
+include package.json package-lock.json tsconfig.json
+recursive-include scripts *.py *.mjs *.ts *.tsx *.js *.css
+include scripts/react19/package.json

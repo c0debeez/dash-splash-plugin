@@ -1,30 +1,31 @@
-# dash-startup-loading-plugin
+# dash-splash-plugin
 
-[English](https://github.com/C0deBeez/dash-startup-loading-plugin/blob/master/README.md) |
-[简体中文](https://github.com/C0deBeez/dash-startup-loading-plugin/blob/master/README.zh-CN.md)
+[English](https://github.com/C0deBeez/dash-splash-plugin/blob/master/README.md) |
+[简体中文](https://github.com/C0deBeez/dash-splash-plugin/blob/master/README.zh-CN.md)
 
 A configurable full-screen startup loading overlay for Dash, packaged as a
 [Dash Hooks plugin](https://dash.plotly.com/dash-plugins-using-hooks).
-Install it to enable the default spinner automatically, or choose from 48 loader
-styles with shared color, size and playback controls. Native Dash and Dash Ant
+Install it to enable the default `loading-ui:fade-arc` loader automatically, or choose from 527 generated loader
+identifiers and presets with shared color, size and playback controls. Native Dash and Dash Ant
 Design applications use the same configuration.
-
-![Animated preview of all 48 loaders running in usage.py](https://raw.githubusercontent.com/C0deBeez/dash-startup-loading-plugin/a2bc500ddbcb2f1c3d6d9f1132a93e115ddd4520/docs/assets/loader-preview.gif)
-
-*Recorded from the repository's `usage.py` demo. This page keeps the loaders
-visible for comparison; an application's startup overlay closes automatically.*
 
 ## Installation
 
-Requires **Python 3.9+** and **Dash 3.0.3+**.
+Requires **Python 3.9+** and **Dash >=4.5.0rc0**.
+
+Native animations support **React 18.3.1 and React 19** and reuse the host's
+React/ReactDOM. No React version override is needed with Dash's default runtime.
+The `loading-dev` library alone requires React 19; select it with
+`REACT_VERSION=19.2.4 python app.py`. On unsupported hosts its immediate HTML/CSS
+fallback remains visible. The plugin never bundles or selects another React.
 
 ```bash
-pip install "dash-startup-loading-plugin>=3.0.0"
+pip install "dash-splash-plugin==0.1.0"
 ```
 
 Dash discovers the plugin through its `dash_hooks` entry point. No explicit
 registration, asset copying or `index_string` replacement is needed to enable
-the overlay. The default Ant Design four-dot spinner is included, with no
+the overlay. The `antd` four-dot spinner is included as a separate loader resource, with no
 component-library dependency.
 
 ## Quick start
@@ -48,9 +49,9 @@ To customize the overlay, call `setup()` before creating the app:
 
 ```python
 from dash import Dash, html
-from dash_startup_loading_plugin import setup
+from dash_splash_plugin import setup
 
-setup(loader="ring", color="#1677ff", size=32, stroke=3, rate=1.0)
+setup(library="loading-ui", loader="ring", color="#1677ff", size=32, stroke=3, rate=1.0)
 
 app = Dash(__name__)
 app.layout = html.H1("My dashboard")
@@ -59,8 +60,8 @@ if __name__ == "__main__":
     app.run(debug=True)
 ```
 
-Use `setup(loader="default")` to select the bundled four-dot spinner,
-`setup(loader="text-shimmer", text="Preparing dashboard", font_size=20)` for a
+The default loader is `loading-ui:fade-arc`; select it explicitly with `setup(library="loading-ui", loader="fade-arc")`. Use `setup(library="antd", loader="antd")` to select the former default four-dot spinner,
+`setup(library="loading-ui", loader="text-shimmer", text="Preparing dashboard", font_size=20)` for a
 text animation, or `setup(enabled=False)` to disable the plugin.
 
 ### Dash Ant Design
@@ -74,23 +75,37 @@ with these components automatically; configure it with the same `setup()` call.
 From a checkout of this repository:
 
 ```bash
-uv sync
+uv sync --group dev
 uv run python usage.py
 ```
 
-Open [http://127.0.0.1:5000](http://127.0.0.1:5000). The demo shows all 48 choices:
-the default spinner and 47 bundled [Loading UI](https://loading-ui.com/) loaders.
-Use **Preview color** to compare six foreground colors. Each card's title is the
-value accepted by `setup(loader=...)`.
+Open [http://127.0.0.1:5001](http://127.0.0.1:5001). Select **Library**, then search
+**Animation** to preview [Loading UI](https://loading-ui.com/) or a public component
+or preset from dash-loading-components. Use **Preview color** to compare five
+foreground colors. The Python example below updates with syntax highlighting.
 
-The previews share `size`, `rate` and `playing` from the `setup()` call near the
-top of `usage.py`; edit those settings and restart the demo to compare them.
-The color dropdown changes the demo previews only.
+Previews use a white background matching the page and an explicit `size=64`.
+They share the parent Dash React instance and the configured `rate` and `playing`
+settings. The selectors update only the preview, not the process-wide configuration.
 
 ## Configuration
 
-`setup(**changes)` updates an immutable, process-wide `StartupLoadingConfig`.
+`setup(**changes)` updates an immutable, process-wide `SplashConfig`.
 Use one configuration per Python process; apps in the same process share it.
+
+Select a library and its short loader name separately; do not pass a combined
+`library:loader` identifier to `setup()`:
+
+```python
+setup(loader="fade-arc")  # Uses the default loading-ui library.
+setup(library="flicker", loader="mail")
+setup(library="spinners", loader="bar")  # No trailing -loader.
+```
+
+Providing `loader` without `library` always selects `loading-ui`. Providing only
+`library` selects its first registered loader (`fade-arc` for `loading-ui`).
+Other omitted settings retain their values. Switching the library or loader
+clears previous `loader_options` unless new options are supplied in the same call.
 
 | Option | Default | Description |
 | --- | ---: | --- |
@@ -99,60 +114,85 @@ Use one configuration per Python process; apps in the same process share it.
 | `z_index` | `9999` | Overlay stacking order. |
 | `background` | `#f5f5f5` | Overlay background in light mode. |
 | `dark_background` | `#000` | Overlay background when `html.dark` is set. |
-| `color` | `"currentColor"` | Inherit the overlay foreground; an explicit CSS color overrides it. |
+| `color` | `"#1890ff"` | Default loader foreground in both themes; set a CSS color to override it. |
 | `dark_color` | `None` | Dark-mode override; falls back to `color`, then inherited foreground. |
 | `text_color` | `None` | Optional text color; falls back to `color`, then inherited foreground. |
 | `dark_text_color` | `None` | Falls back to `text_color`, `dark_color`, `color`, then inherited foreground. |
-| `loader` | `"default"` | Ant Design's four-dot spinner. Use `"ring"` for the Loading UI ring. |
-| `text` | `"Loading"` | Text rendered by `text-*` Loading UI loaders. |
-| `size` | `32` | Graphical loader container's longest side in CSS pixels, keeping the aspect ratio. Text loaders use `font_size`. `None` preserves original geometry; `0` hides the loader. The visible artwork may not fill its container. |
+| `library` | `"loading-ui"` | Animation library, for example `"flicker"`. |
+| `loader` | `"fade-arc"` | Kebab-case loader name within the selected library. |
+| `text` | `"Loading"` | Text rendered by `loading-ui:text*` Loading UI loaders. |
+| `size` | `None` | Loaders retain their native geometry (`antd`: 20px, matching Ant Design Spin medium) unless `size` is specified. Set a CSS pixel size to override; `0` hides the loader. Text loaders use `font_size`. |
 | `stroke` | `None` | Preserve original borders and SVG strokes. A number overrides supported borders and strokes in CSS pixels; dot, text and filled-shape loaders may have no adjustable stroke. |
 | `rate` | `1.0` | Positive relative animation tempo. `2.0` is twice as fast; `0.5` is half speed. |
 | `playing` | `True` | `False` pauses CSS and SVG animations without hiding the loader. |
-| `font_size` | `None` | Font size in CSS pixels for `text-*` loaders; independent of container sizing. |
-| `custom_loader_html` | `None` | Trusted HTML replacing the default spinner. |
+| `font_size` | `None` | Font size in CSS pixels for `loading-ui:text*` loaders; independent of container sizing. |
+| `custom_loader_html` | `None` | Trusted HTML replacing the selected loader. |
+| `loader_options` | `None` | JSON-safe native wrapper options; explicit options override common settings. |
 `custom_loader_html` is inserted verbatim and must only contain trusted HTML.
 
 ### Size and animation
 
-Graphical loaders fit their container's longest side to `size`, preserving their
-aspect ratio. `size=None` retains the original geometry; `size=0` hides the
+Graphical loaders fit their container's longest side to an explicit `size`, preserving their
+aspect ratio. `size=None` retains each loader's original geometry; `size=0` hides the
 loader. Text loaders retain their original font size unless `font_size` is set.
 `stroke=None` preserves the artwork's original borders and strokes.
 
 `rate` must be a finite positive number. Use `playing=False` to pause animations
 while keeping the loader visible. The `size`, `color`, `rate` and `playing`
-parameter names also make it convenient to share a preset with
-`dash-loading-components`; that library is optional and its animations and
-default sizes can differ.
+parameter names match `dash-loading-components`. Its pinned React wrappers,
+including their native speed mappings, are reused at build time. Installing its
+Python package is not necessary. Native options use its snake_case names.
+
+```python
+from dash_splash_plugin import list_libraries, list_loaders, setup
+
+print(list_loaders("loading-dev"))
+print(list_libraries())
+setup(library="loading-dev", loader="arc", size=48, loader_options={"easing": "linear"})
+setup(library="gridora", loader="orbit", size=48, loader_options={"grid_size": 5})
+setup(library="flicker", loader="mycelium", size=48)
+setup(library="loadersz", loader="heatmapping", size=96)
+```
+
+The generated registry covers 47 Loading UI components, `antd`, and all public
+wrappers/presets from 14 dash-loading-components families: loading-dev, ldrs,
+spinners, spinners-react, loader-spinner, premium, indicators, m3, epic, flicker,
+gridora, loadersz, thinking-orbs and lab. Presets share their component chunk.
+`list_loaders()` and the generated `LoaderName` literal are the source of truth.
+
+Library and loader names use kebab-case. Trailing `-loader` is omitted:
+for example, use `setup(library="spinners", loader="bar")`. Select them separately with
+`setup(library="flicker", loader="mail")`, or use the default library:
+`setup(loader="fade-arc")`. `list_libraries()` lists libraries;
+`list_loaders("flicker")` lists their short loader names. Without a library,
+`list_loaders()` returns qualified `library:loader` identifiers for inventory use.
+Select the four-dot spinner with `setup(library="antd", loader="antd")`.
+Epic names also omit `-spinner`: use `setup(library="epic", loader="atom")`
+or `loader="hollow-dots"`. Suffixed Epic names are not accepted.
 
 ### Theme behavior
 
-The plugin follows the root element's `html.dark` class, using `background` and
-`dark_background` for the overlay. Its inherited foreground defaults to
-`rgba(0,0,0,.88)` in light mode and `rgba(255,255,255,.85)` in dark mode. Set
+The plugin follows `html.dark` and `html[data-theme=dark]`, using `background` and
+`dark_background` for the overlay. Without an explicit light/dark root preference,
+it follows `prefers-color-scheme`. Set
 `color` and `dark_color` for custom colors; text loaders use the same color
-unless a text-specific override is supplied.
+unless a text-specific override is supplied. All loaders use `#1890ff` blue
+in both themes by default. The `antd` loader is loaded from its own cacheable JavaScript resource, like the other loaders.
 
 Initialize the application's root `dark`/`light` class before Dash mounts,
 for example with a script in `index_string`. Applications following the system
 theme can use `prefers-color-scheme`. The plugin follows the class and leaves
 theme preferences to the application.
 
-### Migrating configuration names
+### Configuration validation
 
-For one compatibility release, `setup()` accepts deprecated aliases:
-`loader_color` → `color`, `loader_dark_color` → `dark_color`,
-`loader_text_color` → `text_color`, `loader_dark_text_color` → `dark_text_color`,
-`loader_size` → `size`, `loader_stroke_width` → `stroke`, and
-`loader_text` → `text`, and `thickness` → `stroke`. They emit `DeprecationWarning`; supplying an alias and
-its replacement together raises `TypeError`. Configuration objects use the new
-field names. Explicit `size` now means actual container size, not the previous
-32px scaling baseline.
+`setup()` accepts only the current configuration fields listed above. Unknown
+options raise `TypeError` without changing the active configuration. No aliases
+or deprecated parameter conversions are provided.
 
 ```python
-setup(loader="ring", color="#1677ff", size=32, stroke=2)
-setup(loader="text-shimmer", text="Loading", font_size=20)
+setup(library="loading-ui", loader="ring", color="#1677ff", size=32, stroke=2)
+setup(library="loading-ui", loader="text-shimmer", text="Loading", font_size=20)
 ```
 
 ## Startup lifecycle
@@ -162,19 +202,32 @@ The overlay is injected before React mounts and observes Dash's
 overlay is removed. It does not wait for application-specific background work
 or reappear during later callbacks. Use `dcc.Loading` for callback loading states.
 
-The default spinner uses inline HTML and CSS. Other loaders are served as
-individual, cacheable JavaScript bundles, and only the selected loader is loaded.
-Their isolated renderer uses native DOM, CSS and SVG animations without shipping
-React, React DOM or Motion. Strict Content Security Policy configurations must
-allow the injected startup script and style as well as the selected loader route.
+The overlay strictly follows Dash's initial layout mounting. Elapsed time and
+script loading errors do not dismiss it. Its observer is released when the
+overlay is removed.
+
+The first stage is an inline HTML/CSS fallback, visible before React downloads.
+Once a compatible host React is available, the selected original React animation mounts
+in an independent root with Shadow DOM style isolation. Motion components use the
+real Motion runtime. The main Dash root is never replaced. A failed import or
+render keeps the fallback. There is no forced minimum display time.
+
+Only the selected module, its stylesheet and shared dependencies are requested.
+Assets have content-hashed names and immutable caching. Removing the overlay first
+unmounts its React tree, disconnects observers and clears polling. Delayed imports
+cannot remount a dismissed overlay. Reduced-motion preferences pause animations.
+Strict Content Security Policy must allow the inline startup script/style and
+same-origin module/style resources under `_dash-splash-plugin/react/`.
 
 ## Python API
 
 ```python
-from dash_startup_loading_plugin import (
-    StartupLoadingConfig,
+from dash_splash_plugin import (
+    SplashConfig,
     setup,
     get_config,
+    list_loaders,
+    list_libraries,
     reset_config,
 )
 ```
@@ -189,9 +242,24 @@ uv sync --group test
 uv run pytest -q
 ```
 
-To rebuild the bundled Loading UI resources, run
-`uv run python scripts/build_loading_ui.py` with Node.js and npm available.
+To rebuild, run `npm ci` then `uv run python scripts/build_loaders.py`.
+The build fetches exact upstream commits, generates the registry and Python
+literal, and bundles native React modules with React/ReactDOM externalized.
+React 18 is the build baseline. The private `scripts/react19` workspace isolates
+`loading-dev`'s React 19 build dependencies; its runtime requirement is recorded
+in the generated manifest and checked before importing its animation.
+`--upstream PATH --loading-ui PATH` accepts existing checkouts at those commits.
+Run `npm run typecheck` and `npm run test:browser`; use `ALL_LOADERS=1 npm run test:browser` for all 527 choices.
+Repeat with `REACT_VERSION=19.2.4` to test React 19 and `loading-dev` animations.
+The browser tests need Playwright Chromium (`npx playwright install chromium`)
+and a Python interpreter with Dash 4.5.0rc2 (set `PYTHON` to its executable).
+Node, npm and the source checkouts are not required by wheel/sdist users.
+Development uses Dash 4.5.0rc2. The gallery uses only Dash's built-in controls;
+no additional Python component library is needed.
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE). Bundled third-party licenses, upstream NOTICE and
+source revisions ship in `dash_splash_plugin/resources/licenses/`. The M3 library
+retains Apache-2.0 attribution. Excluded upstream libraries and non-open gallery
+patterns are not imported.

@@ -1,4 +1,8 @@
+import ast
+import re
 from pathlib import Path
+from runpy import run_path
+from typing import Any
 
 import tomllib
 
@@ -11,7 +15,14 @@ def test_pypi_metadata_references_the_project_readme():
     )
 
     assert pyproject["project"]["readme"] == "README.md"
+    assert pyproject["project"]["version"] == "0.1.0"
     assert (PROJECT_ROOT / pyproject["project"]["readme"]).is_file()
+    assert pyproject["project"]["dependencies"] == [
+        "dash>=4.5.0rc0",
+        "typing-extensions>=4.11",
+    ]
+    assert pyproject["dependency-groups"]["dev"] == ["dash==4.5.0rc2"]
+    assert "optional-dependencies" not in pyproject["project"]
 
 
 def test_readmes_document_current_setup_and_installation():
@@ -19,6 +30,9 @@ def test_readmes_document_current_setup_and_installation():
     chinese = (PROJECT_ROOT / "README.zh-CN.md").read_text(encoding="utf-8")
 
     for readme in (english, chinese):
+        assert "loader-preview.gif" not in readme
+        assert "dash-mantine-components" not in readme
+        assert 'pip install "dash-splash-plugin==0.1.0"' in readme
         assert "root_selector" not in readme
         assert "required_selectors" not in readme
         assert "pending_selector" not in readme
@@ -28,7 +42,7 @@ def test_readmes_document_current_setup_and_installation():
         assert "spinner_size_px" not in readme
         assert "spinner_stroke_px" not in readme
         assert "size" in readme
-        assert "thickness" in readme
+        assert "stroke" in readme
         assert "text" in readme
         assert "html.dark" in readme
         assert "theme_store" not in readme
@@ -45,12 +59,14 @@ def test_readmes_document_current_setup_and_installation():
         assert "index_string" in readme
         assert "prefers-color-scheme" in readme
         assert "dash_theme_component_id" not in readme
-        assert 'setup(loader="default")' in readme
-        assert 'setup(loader="antd")' not in readme
+        assert 'setup(library="loading-ui", loader="fade-arc")' in readme
+        assert 'setup(library="antd", loader="antd")' in readme
+
         assert "automatically uses the `antd`" not in readme
         assert "自动使用\n`antd` loader" not in readme
-        assert "LOADING-UI-LICENSE" not in readme
-        assert "dash-startup-loading-plugin examples." not in readme
+        assert "loader_options" in readme
+        assert "list_loaders" in readme
+        assert "dash-splash-plugin examples." not in readme
         assert "Installed examples" not in readme
         assert "内置示例" not in readme
 
@@ -59,16 +75,84 @@ def test_readmes_link_to_each_other():
     english = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
     chinese = (PROJECT_ROOT / "README.zh-CN.md").read_text(encoding="utf-8")
 
-    chinese_link = "[简体中文](https://github.com/C0deBeez/dash-startup-loading-plugin/blob/master/README.zh-CN.md)"
-    english_link = "[English](https://github.com/C0deBeez/dash-startup-loading-plugin/blob/master/README.md)"
+    chinese_link = "[简体中文](https://github.com/C0deBeez/dash-splash-plugin/blob/master/README.zh-CN.md)"
+    english_link = "[English](https://github.com/C0deBeez/dash-splash-plugin/blob/master/README.md)"
 
     for readme in (english, chinese):
         assert chinese_link in readme
         assert english_link in readme
 
 
+def test_readme_setup_examples_match_the_current_catalog():
+    from dash_splash_plugin import reset_config, setup
+
+    try:
+        for name in ("README.md", "README.zh-CN.md"):
+            source = (PROJECT_ROOT / name).read_text(encoding="utf-8")
+            examples = re.findall(r"```python\n(.*?)```", source, flags=re.DOTALL)
+            calls = 0
+            for example in examples:
+                for node in ast.walk(ast.parse(example)):
+                    if (
+                        not isinstance(node, ast.Call)
+                        or not isinstance(node.func, ast.Name)
+                        or node.func.id != "setup"
+                    ):
+                        continue
+                    options: dict[str, Any] = {}
+                    for item in node.keywords:
+                        assert item.arg is not None
+                        options[item.arg] = ast.literal_eval(item.value)
+                    reset_config()
+                    setup(**options)
+                    calls += 1
+            assert calls >= 10, name
+    finally:
+        reset_config()
+
+
 def test_package_does_not_duplicate_project_readmes():
-    package_root = PROJECT_ROOT / "src" / "dash_startup_loading_plugin"
+    package_root = PROJECT_ROOT / "src" / "dash_splash_plugin"
 
     assert not (package_root / "README.md").exists()
     assert not (package_root / "README.zh-CN.md").exists()
+
+
+def test_usage_gallery_defaults_to_blue_without_duplicate_blue_option():
+    gallery = run_path(str(PROJECT_ROOT / "usage.py"))
+    preview_colors = gallery["PREVIEW_COLORS"]
+    loader_preview = gallery["loader_preview"]
+
+    assert preview_colors["default"] == ("Default", "#1890ff")
+    assert "blue" not in preview_colors
+    assert "--dash-splash-color:#1890ff" in loader_preview("antd:antd")
+    assert "window.React=parent.React" in loader_preview("antd:antd")
+    assert "--dash-splash-background:#fff" in loader_preview("antd:antd")
+    assert 'data-dash-splash-loader="loading-ui:fade-arc"' in loader_preview(
+        "loading-ui:fade-arc"
+    )
+    assert "--dash-splash-size:64px" in loader_preview("loading-ui:ring")
+
+
+def test_gallery_recreates_the_selected_loader_and_never_silently_falls_back():
+    import pytest
+
+    gallery = run_path(str(PROJECT_ROOT / "usage.py"))
+    update = gallery["update_preview"]
+    for name in (
+        "antd:antd",
+        "loading-ui:bobbing-dots",
+        "ldrs:ring",
+        "loadersz:heatmapping",
+    ):
+        library, loader = name.split(":", 1)
+        frame, code = update(loader, "green", library)
+        props = frame.to_plotly_json()["props"]
+        assert props["key"] == f"{name}:green"
+        assert f'data-dash-splash-loader="{name}"' in props["srcDoc"]
+        assert "--dash-splash-color:#52c41a" in props["srcDoc"]
+        assert f"library={library!r}, loader={loader!r}" in code
+        assert code.startswith("```python\n")
+        assert "color='#52c41a'" in code
+    with pytest.raises(ValueError, match="Unknown loader"):
+        gallery["loader_preview"]("unknown")

@@ -1,0 +1,43 @@
+{
+  "name": "dash-splash-plugin-build",
+  "private": true,
+  "type": "module",
+  "workspaces": ["scripts/react19"],
+  "scripts": {
+    "build": "python scripts/build_loaders.py",
+    "typecheck": "tsc --noEmit",
+    "test:browser": "node --test tests/browser.test.mjs"
+  },
+  "dependencies": {
+    "@alerix/m3-loading-indicator": "1.0.5",
+    "clsx": "2.1.1",
+    "flicker-dot": "0.2.0",
+    "gridora": "0.3.0",
+    "ldrs": "1.1.9",
+    "loadersz": "0.9.0",
+    "motion": "14.6.0",
+    "motion-dom": "14.6.0",
+    "premium-react-loaders": "4.2.0",
+    "prop-types": "15.8.1",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "react-epic-spinners": "0.6.0",
+    "react-loader-spinner": "8.0.2",
+    "react-loading-indicators": "1.0.1",
+    "react-spinners": "0.17.1",
+    "spinners-react": "1.0.11",
+    "styled-components": "6.5.3",
+    "thinking-orbs": "0.3.2"
+  },
+  "devDependencies": {
+    "@babel/parser": "7.29.8",
+    "@tailwindcss/cli": "4.3.3",
+    "@types/react": "18.3.31",
+    "@types/react-dom": "18.3.7",
+    "esbuild": "0.28.2",
+    "lightningcss": "1.32.0",
+    "playwright": "1.58.2",
+    "tailwindcss": "4.3.3",
+    "typescript": "5.9.3"
+  }
+}
