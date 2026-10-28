@@ -119,10 +119,11 @@ setup(loader=loader)
 | 参数 | 默认值 | 说明 |
 | --- | ---: | --- |
 | `enabled` | `True` | 是否注入 startup overlay。 |
+| `theme` | `"auto"` | 遮罩主题策略：`"light"`、`"dark"`、`"auto"` 或 `"system"`。 |
 | `aria_label` | `"Loading"` | 无障碍状态标签。 |
 | `z_index` | `9999` | 遮罩层级。 |
 | `background` | `#f5f5f5` | 亮色模式下的遮罩背景。 |
-| `dark_background` | `#000` | `html.dark` 下的遮罩背景。 |
+| `dark_background` | `#000` | 遮罩解析为暗色模式时的背景。 |
 | `color` | `"#1890ff"` | 明暗主题下的默认 loader 前景色；可设置 CSS 颜色覆盖。 |
 | `dark_color` | `None` | 暗色覆盖，依次回退至 `color`、继承颜色。 |
 | `text_color` | `None` | 可选文字颜色，依次回退至 `color`、继承颜色。 |
@@ -192,13 +193,39 @@ Epic 的八种动画、Flicker 的 64 个预设（包含 `helix`）以及 `spinn
 
 ### 主题行为
 
-插件跟随根节点的 `html.dark` class 和 `html[data-theme=dark]`，分别使用
-`background` 和 `dark_background` 作为遮罩背景。根节点没有明确亮暗偏好时跟随 `prefers-color-scheme`。
-所有 loader 在明暗主题下默认使用 `#1890ff` 蓝色。使用 `color` 与 `dark_color` 自定义颜色；文字 loader 共用这些颜色，也可单独指定文字颜色。
-预渲染动画的 HTML 和样式直接嵌入首屏响应；其他库立即从可缓存分包加载原生组件，不等待宿主 React。
+使用 `theme` 明确指定遮罩的主题策略，颜色值单独配置：
 
-应用应在 Dash 挂载前初始化根节点的 `dark`/`light` class，例如在 `index_string` 中加入脚本。
-跟随系统主题时可使用 `prefers-color-scheme`。插件只跟随 class，主题偏好由应用负责。
+| `theme` | 行为 |
+| --- | --- |
+| `"auto"`（默认） | 跟随应用根节点的主题标记；没有标记时使用亮色，忽略系统偏好。 |
+| `"light"` | 固定亮色，忽略根节点标记和系统偏好。 |
+| `"dark"` | 固定暗色。 |
+| `"system"` | 跟随 `prefers-color-scheme`，忽略根节点标记。 |
+
+`"auto"` 优先读取有效的 `html[data-theme="light"]` 或 `html[data-theme="dark"]`，
+其次读取 `html.dark` / `html.light`。无效属性值会回退到 class；没有暗色标记时使用亮色。
+根节点标记或系统偏好变化时，对应模式会自动更新。插件只设置遮罩样式，不修改应用根节点。
+
+固定亮色的应用可显式配置，即使操作系统使用暗色也保持亮色：
+
+```python
+setup(theme="light", background="#f3f5f4")
+```
+
+支持主题切换的应用可使用：
+
+```python
+setup(theme="auto", background="#f7f9fc", dark_background="#0b1018")
+```
+
+应用应在 Dash 挂载前初始化根节点标记，例如在 `index_string` 中加入脚本，以保证首屏一致。
+React 渲染前的遮罩无法推断 `ConfigProvider` 内的主题设置。
+如需跟随系统，请显式设置 `theme="system"`；与之前的行为不同，`"auto"` 不再回退到系统偏好。
+
+`background` / `dark_background` 设置明暗背景，`color` / `dark_color` 设置动画颜色；
+文字 loader 可通过 `text_color` / `dark_text_color` 单独覆盖。
+所有 loader 在明暗模式下默认使用 `#1890ff` 蓝色。
+预渲染动画的 HTML 和样式直接嵌入首屏响应；其他库从可缓存分包加载原生组件，不等待宿主 React。
 
 ### 配置校验
 

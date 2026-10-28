@@ -13,7 +13,7 @@ from html import escape
 from importlib.metadata import PackageNotFoundError, version
 from importlib.resources import files
 from threading import RLock
-from typing import Any, NamedTuple, TypedDict, cast
+from typing import Any, Literal, NamedTuple, TypedDict, cast
 from weakref import WeakKeyDictionary, ref
 
 from dash import get_app, hooks
@@ -51,6 +51,7 @@ _COLOR_OPTIONS = (
     "dark_text_color",
 )
 _SPLASH_ROUTE = "_dash-splash-plugin"
+Theme = Literal["light", "dark", "auto", "system"]
 
 
 @hooks.setup(priority=100)
@@ -100,6 +101,7 @@ def _requests_pathname_prefix() -> str:
 
 class SetupOptions(TypedDict, total=False):
     enabled: bool
+    theme: Theme
     aria_label: str
     z_index: int
     background: str
@@ -128,6 +130,7 @@ class SplashConfig:
     """
 
     enabled: bool = True
+    theme: Theme = "auto"
     aria_label: str = "Loading"
     z_index: int = 9999
     background: str = "#f5f5f5"
@@ -164,6 +167,10 @@ def _validate_length(name: str, value: float) -> None:
 
 
 def _validate(config: SplashConfig) -> SplashConfig:
+    if not isinstance(config.theme, str) or config.theme not in (
+        "light", "dark", "auto", "system"
+    ):
+        raise ValueError("theme must be 'light', 'dark', 'auto' or 'system'")
     if not isinstance(config.aria_label, str) or not config.aria_label.strip():
         raise ValueError("aria_label must be a non-empty string")
     if isinstance(config.z_index, bool) or not isinstance(config.z_index, int):
@@ -436,6 +443,7 @@ def _overlay_html(config: SplashConfig, loader: str) -> str:
         loader_html = f'<div class="dash-splash__spinner-region">{loader_html}</div>'
     return (
         f'<div class="dash-splash" {_SPLASH_MARKER} '
+        f'data-dash-splash-theme="{config.theme}" '
         'role="status" aria-live="polite" '
         f'aria-label="{escape(config.aria_label, quote=True)}" aria-busy="true" style="{style}">'
         f'<div class="dash-splash__content">{loader_html}</div>'

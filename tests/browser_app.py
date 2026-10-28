@@ -22,12 +22,15 @@ app.layout = html.Div("Ready")
 def preview():
     reset_config()
     setup(
+        theme=request.args.get("splash_theme", "auto"),
         loader=request.args.get("loader", "loading-ui:fade-arc"),
         size=64,
         rate=float(request.args.get("rate", 1)),
         loader_options=json.loads(request.args.get("options", "{}")),
         playing=request.args.get("playing", "true") == "true",
         dark_color="rgb(255, 255, 255)",
+        text_color=request.args.get("text_color"),
+        dark_text_color=request.args.get("dark_text_color"),
     )
     theme = request.args.get("theme", "light")
     development = (

@@ -3,6 +3,7 @@
 from ._catalog import LoaderId, LoaderLibrary
 from .plugin import (
     SplashConfig,
+    Theme,
     __version__,
     get_config,
     list_loaders,
@@ -15,6 +16,7 @@ __all__ = [
     "LoaderId",
     "LoaderLibrary",
     "SplashConfig",
+    "Theme",
     "__version__",
     "get_config",
     "list_loaders",

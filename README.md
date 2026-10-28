@@ -129,10 +129,11 @@ the complete identifier; there is no separate `library` configuration field.
 | Option | Default | Description |
 | --- | ---: | --- |
 | `enabled` | `True` | Enable index injection. |
+| `theme` | `"auto"` | Splash theme policy: `"light"`, `"dark"`, `"auto"` or `"system"`. |
 | `aria_label` | `"Loading"` | Accessible status label. |
 | `z_index` | `9999` | Overlay stacking order. |
 | `background` | `#f5f5f5` | Overlay background in light mode. |
-| `dark_background` | `#000` | Overlay background when `html.dark` is set. |
+| `dark_background` | `#000` | Overlay background when the splash resolves to dark mode. |
 | `color` | `"#1890ff"` | Default loader foreground in both themes; set a CSS color to override it. |
 | `dark_color` | `None` | Dark-mode override; falls back to `color`, then inherited foreground. |
 | `text_color` | `None` | Optional text color; falls back to `color`, then inherited foreground. |
@@ -209,19 +210,45 @@ then the native component mounts with the private runtime to apply those advance
 
 ### Theme behavior
 
-The plugin follows `html.dark` and `html[data-theme=dark]`, using `background` and
-`dark_background` for the overlay. Without an explicit light/dark root preference,
-it follows `prefers-color-scheme`. Set
-`color` and `dark_color` for custom colors; text loaders use the same color
-unless a text-specific override is supplied. All loaders use `#1890ff` blue
-in both themes by default. Pre-rendered markup and styles are embedded in the initial
-response; other libraries immediately load their native components from cacheable
-modules without waiting for the host React.
+Choose the splash theme independently of its color values:
 
-Initialize the application's root `dark`/`light` class before Dash mounts,
-for example with a script in `index_string`. Applications following the system
-theme can use `prefers-color-scheme`. The plugin follows the class and leaves
-theme preferences to the application.
+| `theme` | Behavior |
+| --- | --- |
+| `"auto"` (default) | Follow the application's root theme; fall back to light when none is declared. Ignores the system preference. |
+| `"light"` | Always use light colors, regardless of root markers or system preference. |
+| `"dark"` | Always use dark colors. |
+| `"system"` | Follow `prefers-color-scheme`, regardless of root markers. |
+
+In `"auto"` mode, a valid `html[data-theme="light"]` or `html[data-theme="dark"]`
+takes priority over `html.dark` / `html.light`. Unrecognized attribute values
+fall back to the classes; without a dark marker, the splash is light. Changes
+to root markers or the system preference update the appropriate theme mode.
+The plugin only styles its overlay and does not change the application's root markers.
+
+For a light-only application, including when the operating system is dark:
+
+```python
+setup(theme="light", background="#f3f5f4")
+```
+
+For an application with its own theme switch:
+
+```python
+setup(theme="auto", background="#f7f9fc", dark_background="#0b1018")
+```
+
+Initialize root theme markers before Dash mounts, for example with a script in
+`index_string`, so the first paint matches the app. The pre-React splash cannot
+infer a theme declared inside a React `ConfigProvider`. Set `theme="system"`
+explicitly to use the operating system's preference; unlike previous behavior,
+`"auto"` no longer falls back to it.
+
+`background` / `dark_background` choose the overlay colors. `color` / `dark_color`
+choose the loader colors; text loaders support separate `text_color` /
+`dark_text_color` overrides. All loaders use `#1890ff` blue by default in both
+modes. Pre-rendered markup and styles are embedded in the initial response;
+other libraries load their native components from cacheable modules without
+waiting for the host React.
 
 ### Configuration validation
 

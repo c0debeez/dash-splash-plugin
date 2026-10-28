@@ -12,6 +12,7 @@ import pytest
 from dash import Dash, html
 from dash_splash_plugin import (
     SplashConfig,
+    Theme,
     LoaderId,
     get_config,
     list_loaders,
@@ -33,6 +34,26 @@ def payload(index):
     return json.loads(
         unescape(re.search(r'data-dash-splash-config="([^"]+)"', index)[1])
     )
+
+
+def test_default_theme_follows_app_with_light_fallback():
+    assert get_config().theme == "auto"
+    assert get_type_hints(SetupOptions)["theme"] == Theme
+
+
+@pytest.mark.parametrize("theme", get_args(Theme))
+def test_theme_policy_is_serialized_on_overlay(theme):
+    setup(theme=theme)
+    index = _inject_overlay('<html><head></head><body></body></html>')
+    assert f'data-dash-splash-theme="{theme}"' in index
+
+
+@pytest.mark.parametrize("theme", [None, True, [], "", "sepia"])
+def test_invalid_theme_keeps_previous_configuration(theme):
+    setup(theme="light")
+    with pytest.raises(ValueError, match="theme"):
+        setup(theme=theme)
+    assert get_config().theme == "light"
 
 
 def test_generated_inventory_and_types_are_complete():

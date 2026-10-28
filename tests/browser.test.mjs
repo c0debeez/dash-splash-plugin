@@ -27,6 +27,46 @@ before(async () => {
 });
 after(async () => { await browser?.close(); server?.kill('SIGTERM'); });
 
+test('splash theme policies separate app theme from system preference', async () => {
+  const page = await browser.newPage({colorScheme: 'dark'});
+  const inspect = () => page.locator('[data-dash-splash]').evaluate(overlay => ({
+    background: getComputedStyle(overlay).backgroundColor,
+    color: getComputedStyle(overlay).color,
+    text: getComputedStyle(overlay.querySelector('[data-dash-splash-loader]')).color,
+    rootClass: document.documentElement.className,
+    rootTheme: document.documentElement.getAttribute('data-theme'),
+  }));
+  try {
+    for (const mode of ['auto', 'light', 'dark', 'system']) {
+      await page.emulateMedia({colorScheme: 'dark'});
+      await page.goto(`${base}/preview?loader=loading-ui:text-shimmer&theme=&splash_theme=${mode}&text_color=%23123456&dark_text_color=%23abcdef`);
+      // Check the initial document with no application preference and a dark OS.
+      assert.equal((await inspect()).background, ['dark', 'system'].includes(mode) ? 'rgb(0, 0, 0)' : 'rgb(245, 245, 245)', `${mode}: initial paint`);
+      for (const scheme of ['light', 'dark']) {
+        await page.emulateMedia({colorScheme: scheme});
+        for (const [rootClass, rootTheme] of [
+          ['', null], ['light', null], ['dark', null],
+          ['dark', 'light'], ['light', 'dark'], ['dark', 'sepia'], ['', 'dark'],
+        ]) {
+          await page.evaluate(({rootClass, rootTheme}) => {
+            document.documentElement.className = rootClass;
+            if (rootTheme === null) document.documentElement.removeAttribute('data-theme');
+            else document.documentElement.setAttribute('data-theme', rootTheme);
+          }, {rootClass, rootTheme});
+          const appDark = rootTheme === 'dark' || (rootTheme !== 'light' && rootTheme !== 'dark' && rootClass === 'dark');
+          const dark = mode === 'dark' || (mode === 'system' && scheme === 'dark') || (mode === 'auto' && appDark);
+          assert.deepEqual(await inspect(), {
+            background: dark ? 'rgb(0, 0, 0)' : 'rgb(245, 245, 245)',
+            color: dark ? 'rgb(255, 255, 255)' : 'rgb(24, 144, 255)',
+            text: dark ? 'rgb(171, 205, 239)' : 'rgb(18, 52, 86)',
+            rootClass, rootTheme,
+          }, `${mode}/${scheme}/${rootClass}/${rootTheme}`);
+        }
+      }
+    }
+  } finally { await page.close(); }
+});
+
 test('CSS, Motion and Canvas animate, pause and follow root theme changes', async () => {
   const page = await browser.newPage({viewport: {width: 1280, height: 800}});
   await mkdir('test-results', {recursive: true});
