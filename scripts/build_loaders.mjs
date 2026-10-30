@@ -77,8 +77,6 @@ for (const item of input) {
 import ${item.symbol ? `{${item.symbol} as Component}` : 'Component'} from ${JSON.stringify(item.source)};
 import {render} from ${JSON.stringify(path.join(root, 'scripts/runtime/react-mount.tsx'))};
 ${motion ? `import {bindMotionPlayback} from ${JSON.stringify(path.join(root, 'scripts/runtime/motion-playback.ts'))};` : ''}
-${!legacy && item.family !== 'antd' ? `// Empty upstream defaults trigger a React 18 deprecation warning without providing values.
-if (Component.defaultProps && Object.keys(Component.defaultProps).length === 0) delete Component.defaultProps;` : ''}
 export function mount(host) { return render(host, Component, {family:${JSON.stringify(item.family)},geometry:${JSON.stringify(geometry) ?? 'undefined'},visualScale:${visualScale ?? 'undefined'},bindPlayback:${motion ? 'bindMotionPlayback' : 'undefined'}}); }
 `;
     await writeFile(path.join(directory, `${file}.tsx`), source);
@@ -87,7 +85,7 @@ export function mount(host) { return render(host, Component, {family:${JSON.stri
   loaders[item.id] = { family: item.family, minReact: item.family === 'loading-dev' ? 19 : 18, module: `${metadata.file}.js`, defaults: item.defaults ?? {}, options: metadata.properties };
 }
 
-const privateReact = createRequire(path.join(root, 'scripts/react19/package.json'));
+const privateReact = createRequire(path.join(root, 'package.json'));
 const bridges = {
   name: 'dash-private-react',
   setup(builder) {
@@ -98,7 +96,7 @@ const result = await build({
   entryPoints: entries, outdir: output, bundle: true, splitting: true,
   format: 'esm', platform: 'browser', target: 'es2020', minify: true, metafile: true,
   jsx: 'automatic', define: { 'process.env.NODE_ENV': '"production"' },
-  loader: { '.js': 'jsx' }, nodePaths: [path.join(root, 'node_modules'), path.join(root, 'scripts/react19/node_modules')], plugins: [bridges],
+  loader: { '.js': 'jsx' }, nodePaths: [path.join(root, 'node_modules')], plugins: [bridges],
   alias: { '@/lib/utils': path.join(root, 'scripts/runtime/cn.ts') },
   entryNames: '[name]-[hash]', chunkNames: 'shared-[hash]', assetNames: 'asset-[hash]', legalComments: 'eof'
 });

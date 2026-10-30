@@ -6,7 +6,7 @@ import {createServer} from 'node:net';
 import {chromium} from 'playwright';
 
 let browser, server, base;
-const reactVersion = process.env.REACT_VERSION ?? '18.3.1';
+const reactVersion = process.env.REACT_VERSION ?? '19.2.4';
 const manifest = JSON.parse(await readFile('src/dash_splash_plugin/resources/manifest.json', 'utf8'));
 before(async () => {
   const socket = createServer();
@@ -14,7 +14,7 @@ before(async () => {
   const port = socket.address().port;
   await new Promise(resolve => socket.close(resolve));
   base = `http://127.0.0.1:${port}`;
-  const python = process.env.PYTHON ?? '../dash-antd-components/.venv/bin/python';
+  const python = process.env.PYTHON ?? '.venv/bin/python';
   server = spawn(python, ['tests/browser_app.py', String(port)], {stdio: ['ignore', 'ignore', 'pipe']});
   let logs = '';
   server.stderr.on('data', data => {logs = (logs + data).slice(-5000);});
@@ -427,7 +427,7 @@ test('usage gallery switches real callback previews across animation families', 
   await new Promise(resolve => socket.listen(0, '127.0.0.1', resolve));
   const port = socket.address().port;
   await new Promise(resolve => socket.close(resolve));
-  const python = process.env.PYTHON ?? '../dash-antd-components/.venv/bin/python';
+  const python = process.env.PYTHON ?? '.venv/bin/python';
   const gallery = spawn(python, ['-c',
     `import usage; usage.app.run(host="127.0.0.1",port=${port},debug=False)`],
     {stdio: ['ignore', 'ignore', 'pipe']});

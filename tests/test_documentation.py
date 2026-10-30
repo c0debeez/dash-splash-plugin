@@ -19,10 +19,10 @@ def test_pypi_metadata_references_the_project_readme():
     assert pyproject["project"]["version"] == "0.1.0"
     assert (PROJECT_ROOT / pyproject["project"]["readme"]).is_file()
     assert pyproject["project"]["dependencies"] == [
-        "dash>=4.5.0rc0",
+        "dash>=4.5.0",
         "typing-extensions>=4.11",
     ]
-    assert pyproject["dependency-groups"]["dev"] == ["dash==4.5.0rc2"]
+    assert pyproject["dependency-groups"]["dev"] == ["dash==4.5.0"]
     assert "optional-dependencies" not in pyproject["project"]
 
 

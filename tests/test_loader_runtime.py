@@ -8,8 +8,8 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def test_react_baseline_and_loader_version_requirements():
     package = json.loads((ROOT / "package.json").read_text())
-    assert package["dependencies"]["react"] == "18.3.1"
-    assert package["dependencies"]["react-dom"] == "18.3.1"
+    assert package["dependencies"]["react"] == "19.2.4"
+    assert package["dependencies"]["react-dom"] == "19.2.4"
     manifest = json.loads((ROOT / "src/dash_splash_plugin/resources/manifest.json").read_text())
     for item in manifest["loaders"].values():
         assert item["minReact"] == (19 if item["family"] == "loading-dev" else 18)

@@ -11,12 +11,21 @@ Design applications use the same configuration.
 
 ## Installation
 
-Requires **Python 3.9+** and **Dash >=4.5.0rc0**.
+Requires **Python 3.9+** and **Dash >=4.5.0**.
 
-Host applications can use **React 18.3.1 or React 19**. The plugin bundles a
-private React 19 runtime for native animations and never reads or replaces the
-host's React/ReactDOM. Animations start before Dash's React finishes loading;
-even `loading-dev` does not require changing the application's React version.
+The build, server rendering, types, gallery, and default browser tests use
+**React 19.2.4**. Native animations use a private React 19 runtime that never
+reads or replaces the host's React/ReactDOM, so they start before Dash loads.
+
+Dash 4.5.0 supports React 19 as an opt-in; its default remains React 18.3.1.
+For your application, set `REACT_VERSION=19.2.4` before starting Python:
+
+```bash
+REACT_VERSION=19.2.4 python app.py
+```
+
+The included `usage.py` gallery defaults to React 19.2.4. Existing React 18
+hosts remain isolated from the plugin's runtime.
 
 Until the first PyPI release, install from a checkout of this repository:
 
@@ -341,18 +350,19 @@ distributions include the Python runtime, prebuilt assets, typing files and
 licenses, but exclude `scripts/`, npm configuration, tests and demo files.
 The build fetches exact upstream commits, generates the registry and Python
 literal, and bundles native React modules with one shared, private React 19 runtime.
-The `scripts/react19` workspace isolates these browser runtime dependencies from
-the React 18 server-rendering/type baseline. The manifest records upstream React
-requirements; the bundled runtime satisfies them without changing the host.
+Browser bundles and build-time server rendering share the root React 19.2.4
+dependency and React 19 types. The manifest records upstream React requirements;
+the bundled runtime satisfies them without changing the host.
 `--upstream PATH --loading-ui PATH` accepts existing checkouts at those commits.
 Run `npm run typecheck` and `npm run test:browser`; use `ALL_LOADERS=1 npm run test:browser` for all 530 choices.
-Repeat with `REACT_VERSION=19.2.4` to verify isolation from a React 19 host.
+Browser tests default to a React 19.2.4 host. Repeat with
+`REACT_VERSION=18.3.1` to verify isolation from a React 18 host.
 Use `ALL_LOADERS=1 NO_HOST_REACT=1 npm run test:browser` to block the host React
 scripts and check that all animations still render.
 The browser tests need Playwright Chromium (`npx playwright install chromium`)
-and a Python interpreter with Dash 4.5.0rc2 (set `PYTHON` to its executable).
+and a Python interpreter with Dash 4.5.0 (set `PYTHON` to its executable).
 Node, npm and the source checkouts are not required by wheel/sdist users.
-Development uses Dash 4.5.0rc2. The gallery uses only Dash's built-in controls;
+Development uses Dash 4.5.0. The gallery uses only Dash's built-in controls;
 no additional Python component library is needed.
 
 ## License

@@ -8,11 +8,19 @@
 
 ## 安装
 
-需要 **Python 3.9+** 和 **Dash >=4.5.0rc0**。
+需要 **Python 3.9+** 和 **Dash >=4.5.0**。
 
-宿主应用可使用 **React 18.3.1 或 React 19**。插件为原生动画独立打包私有 React 19
-运行时，不读取或替换宿主的 React/ReactDOM。动画无需等待 Dash 的 React 加载，
-包括 `loading-dev` 在内均不要求更改主应用的 React 版本。
+构建、服务端预渲染、类型、演示和默认浏览器测试统一使用 **React 19.2.4**。
+原生动画仍使用私有 React 19 运行时，不读取或替换宿主 React/ReactDOM，可在 Dash 加载前启动。
+
+Dash 4.5.0 支持显式启用 React 19，默认仍为 React 18.3.1。
+应用可在启动 Python 前设置：
+
+```bash
+REACT_VERSION=19.2.4 python app.py
+```
+
+内置 `usage.py` 演示默认启用 React 19.2.4。已有 React 18 宿主仍与插件运行时隔离。
 
 首次发布 PyPI 前，请在本仓库的源码目录中安装：
 
@@ -308,15 +316,15 @@ uv run pytest -q
 重建前端需要使用 Git 仓库源码。Python wheel 和源码包只包含 Python 运行时代码、
 预构建资源、类型文件和许可证，不包含 `scripts/`、npm 配置、测试和演示文件。
 构建锁定上游提交，自动生成清单和 Python 字面量类型，并将私有 React 19 运行时打包为共享分包。
-`scripts/react19` workspace 将浏览器运行时依赖与 React 18 的服务端预渲染和类型基线隔离。
+浏览器分包与服务端预渲染共用根目录的 React 19.2.4 依赖和 React 19 类型。
 生成清单记录上游最低版本，私有运行时满足这些要求，无需修改宿主版本。
 可通过 `--upstream PATH --loading-ui PATH` 指定对应提交的本地源码。
 运行 `npm run typecheck` 检查类型，`npm run test:browser` 验证浏览器行为；`ALL_LOADERS=1 npm run test:browser` 遍历全部标识。
-设置 `REACT_VERSION=19.2.4` 再次运行，可验证与 React 19 宿主的隔离。
+浏览器测试默认使用 React 19.2.4 宿主；设置 `REACT_VERSION=18.3.1` 可验证与 React 18 宿主的隔离。
 使用 `ALL_LOADERS=1 NO_HOST_REACT=1 npm run test:browser` 阻断宿主 React 脚本并验证全部动画。
 浏览器测试需先执行 `npx playwright install chromium`，并通过 `PYTHON` 指定安装了
-Dash 4.5.0rc2 的解释器。wheel/sdist 用户无需 Node、npm 或上游源码。
-开发版本固定为 Dash 4.5.0rc2，演示只使用 Dash 内置控件，无需额外安装 Python 组件库。
+Dash 4.5.0 的解释器。wheel/sdist 用户无需 Node、npm 或上游源码。
+开发版本固定为 Dash 4.5.0，演示只使用 Dash 内置控件，无需额外安装 Python 组件库。
 
 ## License
 

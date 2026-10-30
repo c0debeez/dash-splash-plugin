@@ -7,7 +7,7 @@ from importlib.resources import files
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-REACT_VERSION = os.environ.setdefault("REACT_VERSION", "18.3.1")
+REACT_VERSION = os.environ.setdefault("REACT_VERSION", "19.2.4")
 
 from dash import Dash, html
 from flask import request, send_file

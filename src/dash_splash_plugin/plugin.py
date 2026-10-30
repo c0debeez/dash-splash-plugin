@@ -17,7 +17,8 @@ from typing import Any, Literal, NamedTuple, TypedDict, cast
 from weakref import WeakKeyDictionary, ref
 
 from dash import get_app, hooks
-from flask import abort, current_app, has_request_context, request
+from dash.exceptions import AppNotFoundError
+from flask import current_app, has_request_context, request
 from typing_extensions import Unpack
 
 from ._catalog import LoaderId, LoaderLibrary
@@ -64,6 +65,7 @@ def _register_dash_app(app: Any) -> None:
 def _current_app() -> Any:
     """Return the Dash app serving the current request, or ``None`` outside one."""
 
+    # Flask index hooks still need prefix matching when apps share one server.
     if has_request_context():
         server = cast(Any, current_app)._get_current_object()
         apps = [
@@ -80,14 +82,13 @@ def _current_app() -> Any:
             return max(
                 matches or apps, key=lambda app: len(app.config.routes_pathname_prefix)
             )
-    # Dash 4 binds plugin routes and index hooks to their app's context, including
-    # non-Flask backends. Only accept it during a request, not its global fallback.
+    # Other backends use Dash's app context; ignore its global fallback outside
+    # a request so standalone HTML uses the default prefix.
     try:
         app = get_app()
-    except Exception:  # Dash 3 raises a plain Exception when no app exists.
+    except AppNotFoundError:
         return None
-    backend = getattr(app, "backend", None)
-    if backend is not None and backend.has_request_context():
+    if app.backend.has_request_context():
         return app
     return None
 
@@ -425,7 +426,6 @@ def _loader_markup(config: SplashConfig, loader: str) -> str:
     return (
         f'<span class="dash-splash__loader" data-dash-splash-loader="{escape(loader, quote=True)}" '
         f'data-dash-splash-module="{escape(base + item["module"], quote=True)}"{css}{standalone} '
-        f'data-dash-splash-react-min="{item.get("minReact", 18)}" '
         f'data-dash-splash-config="{encoded}" aria-hidden="true">'
         f'{content}</span>'
     )
@@ -471,25 +471,15 @@ def _resource_text(name: str) -> str:
 def serve_splash_asset(asset: str = ""):
     """Serve allowlisted, content-hashed React modules and their stylesheets."""
 
-    app = _current_app()
-    backend = getattr(app, "backend", None) if app is not None else None
+    backend = get_app().backend
     if asset not in _MANIFEST["files"]:
-        if backend is not None:
-            return backend.make_response("", status=404)
-        abort(404)
-    if backend is not None:
-        response = backend.make_response(
-            _resource_text(f"react/{asset}"),
-            mimetype="text/css" if asset.endswith(".css") else "text/javascript",
-        )
-        response.headers["Cache-Control"] = _ASSET_CACHE_CONTROL
-        return response
-
-    return current_app.response_class(
+        return backend.make_response("", status=404)
+    response = backend.make_response(
         _resource_text(f"react/{asset}"),
         mimetype="text/css" if asset.endswith(".css") else "text/javascript",
-        headers={"Cache-Control": _ASSET_CACHE_CONTROL},
     )
+    response.headers["Cache-Control"] = _ASSET_CACHE_CONTROL
+    return response
 
 
 def _with_splash_runtime(head: str) -> str:

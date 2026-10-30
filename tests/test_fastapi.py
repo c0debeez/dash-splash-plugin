@@ -1,6 +1,5 @@
 """Exercise optional Dash 4 backends with their real request context."""
 
-import inspect
 import re
 
 import pytest
@@ -10,8 +9,6 @@ from dash_splash_plugin import reset_config, setup
 
 pytest.importorskip("fastapi")
 pytest.importorskip("httpx")
-if "backend" not in inspect.signature(Dash).parameters:
-    pytest.skip("FastAPI backends require Dash 4", allow_module_level=True)
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient

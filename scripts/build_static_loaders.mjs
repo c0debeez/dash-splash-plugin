@@ -20,7 +20,6 @@ const importedCSS = existsSync(bundledCSS) ? readFileSync(bundledCSS, 'utf8') : 
 for (const {id, Component, defaults, family} of native) {
   const sheet = new ServerStyleSheet();
   try {
-    if (Component.defaultProps && Object.keys(Component.defaultProps).length === 0) delete Component.defaultProps;
     const color = family === 'spinners' ? 'rgb(from currentColor r g b)' : 'currentColor';
     const geometry = id === 'spinners:propagate' ? {style: {width: 175, height: 15, display: 'grid', placeItems: 'center'}} : {};
     const html = renderToStaticMarkup(sheet.collectStyles(React.createElement(Component, {...defaults, color, ...geometry})));

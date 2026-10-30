@@ -3,11 +3,11 @@ import {createRoot} from 'react-dom/client';
 import {StyleSheetManager} from 'styled-components';
 
 type Config = {
-  color?: string; size?: number; stroke?: number; font_size?: number;
+  size?: number; stroke?: number; font_size?: number;
   text: string; rate: number; playing: boolean; loader_options: Record<string, unknown>;
 };
 type Definition = {
-  family: string; defaults?: Record<string, unknown>; geometry?: React.CSSProperties;
+  family: string; geometry?: React.CSSProperties;
   visualScale?: number;
   bindPlayback?: (element: HTMLElement, rate: number, playing: boolean) => () => void;
 };
@@ -61,7 +61,7 @@ function Artwork({host, Component, definition, config, ready}: {
   if (config.loader_options.still !== undefined) requestedPlaying = !config.loader_options.still;
   const playing = Boolean(requestedPlaying) && !reduced;
   const props: Record<string, unknown> = {
-    ...definition.defaults, color, rate: config.rate, playing,
+    color, rate: config.rate, playing,
     ...(config.size === undefined ? {} : {size: config.size}),
     ...(config.stroke === undefined ? {} : {thickness: config.stroke}),
     ...config.loader_options,

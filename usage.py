@@ -1,7 +1,10 @@
 """Preview the generated native React loader catalog without loading every family."""
 
+import os
 from dataclasses import replace
 from html import escape
+
+os.environ.setdefault("REACT_VERSION", "19.2.4")
 
 from dash import Dash, Input, Output, dcc, html
 

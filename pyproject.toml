@@ -22,7 +22,7 @@ classifiers = [
 ]
 license = "MIT"
 license-files = ["LICENSE", "src/dash_splash_plugin/resources/licenses/*"]
-dependencies = ["dash>=4.5.0rc0", "typing-extensions>=4.11"]
+dependencies = ["dash>=4.5.0", "typing-extensions>=4.11"]
 
 [project.urls]
 "Homepage" = "https://github.com/c0debeez/dash-splash-plugin"
@@ -31,7 +31,7 @@ dependencies = ["dash>=4.5.0rc0", "typing-extensions>=4.11"]
 
 
 [dependency-groups]
-dev = ["dash==4.5.0rc2"]
+dev = ["dash==4.5.0"]
 test = ["pytest>=8"]
 
 [project.entry-points."dash_hooks"]
